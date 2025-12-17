@@ -1,10 +1,10 @@
-package com.keer.fastio;
+package com.keer.fastio.storage;
 
-import com.keer.fastio.entity.BucketMeta;
-import com.keer.fastio.entity.MultipartUploadMeta;
-import com.keer.fastio.entity.ObjectMeta;
-import com.keer.fastio.handler.ObjectReadHandle;
-import com.keer.fastio.request.*;
+import com.keer.fastio.common.entity.BucketMeta;
+import com.keer.fastio.common.entity.MultipartUploadMeta;
+import com.keer.fastio.common.entity.ObjectMeta;
+import com.keer.fastio.storage.handler.ObjectReadHandle;
+import com.keer.fastio.storage.request.*;
 
 import java.util.List;
 

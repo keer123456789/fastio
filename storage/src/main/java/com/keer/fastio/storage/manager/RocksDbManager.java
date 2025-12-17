@@ -1,4 +1,4 @@
-package com.keer.fastio.manager;
+package com.keer.fastio.storage.manager;
 
 import org.rocksdb.CompressionType;
 import org.rocksdb.Options;

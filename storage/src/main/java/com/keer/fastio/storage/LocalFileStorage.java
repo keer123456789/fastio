@@ -1,15 +1,15 @@
-package com.keer.fastio;
+package com.keer.fastio.storage;
 
-import com.keer.fastio.entity.BucketMeta;
-import com.keer.fastio.entity.MultipartUploadMeta;
-import com.keer.fastio.entity.ObjectMeta;
-import com.keer.fastio.enums.ExceptionErrorMsg;
-import com.keer.fastio.exception.ServiceException;
-import com.keer.fastio.handler.ObjectReadHandle;
-import com.keer.fastio.manager.RocksDbManager;
-import com.keer.fastio.request.*;
-import com.keer.fastio.utils.FileUtils;
-import com.keer.fastio.utils.JsonUtil;
+import com.keer.fastio.common.entity.BucketMeta;
+import com.keer.fastio.common.entity.MultipartUploadMeta;
+import com.keer.fastio.common.entity.ObjectMeta;
+import com.keer.fastio.common.enums.ExceptionErrorMsg;
+import com.keer.fastio.common.exception.ServiceException;
+import com.keer.fastio.storage.handler.ObjectReadHandle;
+import com.keer.fastio.storage.manager.RocksDbManager;
+import com.keer.fastio.common.utils.FileUtils;
+import com.keer.fastio.common.utils.JsonUtil;
+import com.keer.fastio.storage.request.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,17 +28,16 @@ public class LocalFileStorage implements StorageFacade {
     /**
      * 系统根目录
      */
-    private String rootPath;
+    private String systemPath;
     private String cachePath;
-    private String objectPath;
+    private List<String> dataPaths;
     private RocksDbManager dbManager;
 
-    public LocalFileStorage(String rootPath) {
-        this.rootPath = rootPath;
-        this.cachePath = rootPath + "/cache";
+    public LocalFileStorage(String systemPath,List<String> dataPaths) {
+        this.systemPath = systemPath;
+        this.cachePath = systemPath + "/cache";
         FileUtils.mkdirs(cachePath);
-        this.objectPath = rootPath + "/object";
-        FileUtils.mkdirs(objectPath);
+        this.dataPaths = dataPaths ;
         this.dbManager = RocksDbManager.getInstance(this.cachePath);
     }
 
@@ -48,7 +47,8 @@ public class LocalFileStorage implements StorageFacade {
             logger.warn("bucket has alread exist! {}", bucket);
             throw new ServiceException(ExceptionErrorMsg.BucketExists);
         }
-        String path = objectPath + "/" + bucket;
+        //TODO 如何均匀分配桶
+        String path = dataPaths.get(0) + "/" + bucket;
         if (!FileUtils.mkdirs(path)) {
             throw new ServiceException(ExceptionErrorMsg.FileCreatFail);
         }

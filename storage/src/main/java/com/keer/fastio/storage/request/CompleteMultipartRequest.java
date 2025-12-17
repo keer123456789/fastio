@@ -1,4 +1,4 @@
-package com.keer.fastio.request;
+package com.keer.fastio.storage.request;
 
 /**
  * @author 张经伦

@@ -1,6 +1,6 @@
-package com.keer.fastio.request;
+package com.keer.fastio.storage.request;
 
-import com.keer.fastio.enums.ReadSource;
+import com.keer.fastio.common.enums.ReadSource;
 
 /**
  * @author 张经伦

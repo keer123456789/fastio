@@ -1,7 +1,7 @@
-package com.keer.fastio.request;
+package com.keer.fastio.storage.request;
 
-import com.keer.fastio.enums.StorageWriteMode;
-import com.keer.fastio.enums.WriteSource;
+import com.keer.fastio.common.enums.StorageWriteMode;
+import com.keer.fastio.common.enums.WriteSource;
 
 import java.nio.channels.ReadableByteChannel;
 import java.util.Map;
