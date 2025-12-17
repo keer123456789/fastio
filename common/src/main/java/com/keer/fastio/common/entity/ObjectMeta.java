@@ -1,4 +1,4 @@
-package com.keer.fastio.entity;
+package com.keer.fastio.common.entity;
 
 /**
  * @author 张经伦
