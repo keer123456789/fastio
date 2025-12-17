@@ -1,11 +1,11 @@
-package com.keer.fastio.utils;
+package com.keer.fastio.common.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.keer.fastio.enums.ExceptionErrorMsg;
-import com.keer.fastio.exception.ServiceException;
+import com.keer.fastio.common.enums.ExceptionErrorMsg;
+import com.keer.fastio.common.exception.ServiceException;
 
 import java.text.SimpleDateFormat;
 

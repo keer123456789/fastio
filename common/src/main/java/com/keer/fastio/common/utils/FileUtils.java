@@ -1,4 +1,4 @@
-package com.keer.fastio.utils;
+package com.keer.fastio.common.utils;
 
 import java.io.File;
 

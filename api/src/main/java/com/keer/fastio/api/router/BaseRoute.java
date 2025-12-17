@@ -2,7 +2,7 @@ package com.keer.fastio.api.router;
 
 import com.keer.fastio.api.router.handler.HttpHandler;
 
-import com.keer.fastio.utils.JsonUtil;
+import com.keer.fastio.common.utils.JsonUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.*;

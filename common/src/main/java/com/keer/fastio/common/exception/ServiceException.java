@@ -1,6 +1,6 @@
-package com.keer.fastio.exception;
+package com.keer.fastio.common.exception;
 
-import com.keer.fastio.enums.ExceptionErrorMsg;
+import com.keer.fastio.common.enums.ExceptionErrorMsg;
 
 /**
  * @author 张经伦

@@ -1,6 +1,6 @@
-package com.keer.fastio.enums;
+package com.keer.fastio.common.enums;
 
-public enum WriteSource {
+public enum ReadSource {
     API,
     INTERNAL_REPLICA,
     REBALANCE,

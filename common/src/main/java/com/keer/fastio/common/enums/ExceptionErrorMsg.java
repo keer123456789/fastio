@@ -1,4 +1,4 @@
-package com.keer.fastio.enums;
+package com.keer.fastio.common.enums;
 
 /**
  * @author 张经伦
