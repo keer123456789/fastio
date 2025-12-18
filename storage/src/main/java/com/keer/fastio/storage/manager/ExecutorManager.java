@@ -26,7 +26,7 @@ public class ExecutorManager {
     private ExecutorService deleteBucketTaskExecutor = Executors.newSingleThreadExecutor(new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
-            Thread t = new Thread(r, "DBT");
+            Thread t = new Thread(r, "ExecutorManagerThread" );
             return t;
         }
     });

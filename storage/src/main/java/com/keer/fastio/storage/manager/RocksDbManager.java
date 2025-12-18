@@ -1,5 +1,6 @@
 package com.keer.fastio.storage.manager;
 
+import com.keer.fastio.common.manager.AbstractResourceManager;
 import org.rocksdb.CompressionType;
 import org.rocksdb.Options;
 import org.rocksdb.RocksDB;
@@ -17,26 +18,23 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * @date 2025/12/14 19:26
  * @description: rocke
  */
-public class RocksDbManager implements AutoCloseable {
+public class RocksDbManager extends AbstractResourceManager {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbManager.class);
     private String dbpath;
     private RocksDB db;
-    private static RocksDbManager _instance;
     private static final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-    private RocksDbManager(String dbpath) {
+    public RocksDbManager(String dbpath) {
         this.dbpath = dbpath;
-        init();
     }
 
-    public static RocksDbManager getInstance(String dbpath) {
-        if (_instance == null) {
-            _instance = new RocksDbManager(dbpath);
-        }
-        return _instance;
+    @Override
+    public int getOrder() {
+        return 0;
     }
 
-    private void init() {
+    @Override
+    protected void doInit() throws Exception {
         try {
             final Options options = new Options();
             options.setCreateIfMissing(true);
@@ -57,6 +55,21 @@ public class RocksDbManager implements AutoCloseable {
             throw new RuntimeException("无法启动 RocksDB", e);
         }
     }
+
+    @Override
+    protected void doClose() throws Exception {
+        lock.writeLock().lock();
+        try {
+            if (db != null) {
+                db.close();
+                db = null;
+                logger.info("RocksDB 已关闭");
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
 
     public String getDbpath() {
         return dbpath;
@@ -123,19 +136,7 @@ public class RocksDbManager implements AutoCloseable {
         return get(key) != null;
     }
 
-    // 关闭数据库（应用退出时调用）
-    public void close() throws Exception {
-        lock.writeLock().lock();
-        try {
-            if (db != null) {
-                db.close();
-                db = null;
-                logger.info("RocksDB 已关闭");
-            }
-        } finally {
-            lock.writeLock().unlock();
-        }
-    }
+
     // 工具方法：byte[] 转 hex（用于日志）
     private static String bytesToHex(byte[] bytes) {
         if (bytes == null) return "null";

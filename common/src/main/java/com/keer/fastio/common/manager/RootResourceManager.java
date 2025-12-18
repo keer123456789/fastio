@@ -35,7 +35,7 @@ public class RootResourceManager implements Manager {
 
 
     @Override
-    public synchronized  void init() throws Exception {
+    public synchronized void init() throws Exception {
         if (initialized.get()) {
             return;
         }
@@ -111,5 +111,8 @@ public class RootResourceManager implements Manager {
         }
     }
 
-
+    @SuppressWarnings("unchecked")
+    public <T extends AbstractResourceManager> T getManager(Class<T> tClass) {
+        return (T) map.get(tClass);
+    }
 }
