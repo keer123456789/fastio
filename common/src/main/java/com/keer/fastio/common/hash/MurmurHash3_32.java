@@ -91,4 +91,9 @@ public class MurmurHash3_32 {
         return hash32(data, 0, data.length, 0);
     }
 
+
+    public static void main(String[] args) {
+        System.out.println(hash32("/data1" ,1));
+    }
+
 }
