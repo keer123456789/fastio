@@ -1,15 +1,15 @@
 package com.keer.fastio.storage.manager;
 
 import com.keer.fastio.common.manager.AbstractResourceManager;
-import org.rocksdb.CompressionType;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
+import com.keer.fastio.common.utils.ByteUtils;
+import org.rocksdb.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -90,7 +90,7 @@ public class RocksDbManager extends AbstractResourceManager {
         try {
             db.put(key, value);
         } catch (RocksDBException e) {
-            logger.error("RocksDB put 失败: key={}", bytesToHex(key), e);
+            logger.error("RocksDB put 失败: key={}", ByteUtils.bytesToHex(key), e);
         } finally {
             lock.writeLock().unlock();
         }
@@ -108,7 +108,7 @@ public class RocksDbManager extends AbstractResourceManager {
         try {
             return db.get(key);
         } catch (RocksDBException e) {
-            logger.error("RocksDB get 失败: key={}", bytesToHex(key), e);
+            logger.error("RocksDB get 失败: key={}", ByteUtils.bytesToHex(key), e);
             return null;
         } finally {
             lock.readLock().unlock();
@@ -125,7 +125,7 @@ public class RocksDbManager extends AbstractResourceManager {
         try {
             db.delete(key);
         } catch (RocksDBException e) {
-            logger.error("RocksDB delete 失败: key={}", bytesToHex(key), e);
+            logger.error("RocksDB delete 失败: key={}", ByteUtils.bytesToHex(key), e);
         } finally {
             lock.writeLock().unlock();
         }
@@ -137,14 +137,40 @@ public class RocksDbManager extends AbstractResourceManager {
     }
 
 
-    // 工具方法：byte[] 转 hex（用于日志）
-    private static String bytesToHex(byte[] bytes) {
-        if (bytes == null) return "null";
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
+    public List<String> queryByStartPrefix(String prefix) {
+        List<String> results = new LinkedList<>();
+        // 使用前缀迭代器
+        try (final ReadOptions readOptions = new ReadOptions();
+             final RocksIterator iterator = db.newIterator(readOptions)) {
+
+            // 查找以 "user_" 开头的所有key
+            byte[] prefixBytes = prefix.getBytes();
+
+            for (iterator.seek(prefixBytes); iterator.isValid(); iterator.next()) {
+                byte[] key = iterator.key();
+
+                // 检查是否仍然匹配前缀
+                if (!startsWith(key, prefixBytes)) {
+                    break;
+                }
+
+                // 处理匹配的键值对
+                byte[] value = iterator.value();
+                try {
+                    results.add(new String(db.get(value)));
+                } catch (Exception e) {
+
+                }
+            }
         }
-        return sb.toString();
+        return results;
     }
 
+    private boolean startsWith(byte[] array, byte[] prefix) {
+        if (prefix.length > array.length) return false;
+        for (int i = 0; i < prefix.length; i++) {
+            if (array[i] != prefix[i]) return false;
+        }
+        return true;
+    }
 }

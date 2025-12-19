@@ -28,4 +28,92 @@ public class GetObjectRequest {
 
     // ===== 来源 =====
     private ReadSource source;
+
+    public String getBucket() {
+        return bucket;
+    }
+
+    public void setBucket(String bucket) {
+        this.bucket = bucket;
+    }
+
+    public String getKey() {
+        return key;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
+    }
+
+    public Long getRangeStart() {
+        return rangeStart;
+    }
+
+    public void setRangeStart(Long rangeStart) {
+        this.rangeStart = rangeStart;
+    }
+
+    public Long getRangeEnd() {
+        return rangeEnd;
+    }
+
+    public void setRangeEnd(Long rangeEnd) {
+        this.rangeEnd = rangeEnd;
+    }
+
+    public String getIfMatch() {
+        return ifMatch;
+    }
+
+    public void setIfMatch(String ifMatch) {
+        this.ifMatch = ifMatch;
+    }
+
+    public String getIfNoneMatch() {
+        return ifNoneMatch;
+    }
+
+    public void setIfNoneMatch(String ifNoneMatch) {
+        this.ifNoneMatch = ifNoneMatch;
+    }
+
+    public Long getIfModifiedSince() {
+        return ifModifiedSince;
+    }
+
+    public void setIfModifiedSince(Long ifModifiedSince) {
+        this.ifModifiedSince = ifModifiedSince;
+    }
+
+    public Long getIfUnmodifiedSince() {
+        return ifUnmodifiedSince;
+    }
+
+    public void setIfUnmodifiedSince(Long ifUnmodifiedSince) {
+        this.ifUnmodifiedSince = ifUnmodifiedSince;
+    }
+
+    public boolean isHeadOnly() {
+        return headOnly;
+    }
+
+    public void setHeadOnly(boolean headOnly) {
+        this.headOnly = headOnly;
+    }
+
+    public boolean isStrongConsistency() {
+        return strongConsistency;
+    }
+
+    public void setStrongConsistency(boolean strongConsistency) {
+        this.strongConsistency = strongConsistency;
+    }
+
+    public ReadSource getSource() {
+        return source;
+    }
+
+    public void setSource(ReadSource source) {
+        this.source = source;
+    }
 }

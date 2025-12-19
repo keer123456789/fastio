@@ -13,6 +13,8 @@ public enum ExceptionErrorMsg {
 
 
     FileCreatFail("3400", "file/dir creation fail"),
+    FileNoDiskWriteFail("3401", "file no disk write "),
+    FileWriteFail("3402", "data do not write to local file"),
     ;
 
     private String code;

@@ -3,20 +3,30 @@ package com.keer.fastio.storage;
 import com.keer.fastio.common.entity.BucketMeta;
 import com.keer.fastio.common.entity.MultipartUploadMeta;
 import com.keer.fastio.common.entity.ObjectMeta;
+import com.keer.fastio.common.entity.PartMeta;
 import com.keer.fastio.common.enums.ExceptionErrorMsg;
+import com.keer.fastio.common.enums.ObjectStatus;
 import com.keer.fastio.common.exception.ServiceException;
 import com.keer.fastio.common.manager.RootResourceManager;
+import com.keer.fastio.common.utils.HashUtils;
+import com.keer.fastio.common.utils.JsonUtil;
+import com.keer.fastio.storage.entity.LocalStorageUnit;
+import com.keer.fastio.storage.entity.LockKeys;
+import com.keer.fastio.storage.handler.DefaultObjectReadHandle;
 import com.keer.fastio.storage.handler.ObjectReadHandle;
 import com.keer.fastio.storage.manager.LocalDiskManager;
+import com.keer.fastio.storage.manager.ObjectLockManager;
 import com.keer.fastio.storage.manager.RocksDbManager;
-import com.keer.fastio.common.utils.FileUtils;
-import com.keer.fastio.common.utils.JsonUtil;
 import com.keer.fastio.storage.request.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.*;
+import java.util.concurrent.locks.Lock;
+import java.util.stream.Collectors;
 
 /**
  * @author 张经伦
@@ -27,18 +37,20 @@ public class LocalFileStorage implements StorageFacade {
     private static final Logger logger = LoggerFactory.getLogger(LocalFileStorage.class);
     private static final String CACHE_BUCKET_PREFIX = "bucket_";
     private static final String CACHE_OBJECT_PREFIX = "object_";
-
+    private static final String CACHE_Multi_PREFIX = "multi_";
     private LocalDiskManager localDiskManager;
     private RocksDbManager dbManager;
+    private ObjectLockManager objectLockManager;
 
     public LocalFileStorage() {
         this.localDiskManager = RootResourceManager.getInstance().getManager(LocalDiskManager.class);
         this.dbManager = RootResourceManager.getInstance().getManager(RocksDbManager.class);
+        this.objectLockManager = RootResourceManager.getInstance().getManager(ObjectLockManager.class);
     }
 
     @Override
     public void createBucket(String bucket) {
-        if (!bucketExists(bucket)) {
+        if (bucketExists(bucket)) {
             logger.warn("bucket has alread exist! {}", bucket);
             throw new ServiceException(ExceptionErrorMsg.BucketExists);
         }
@@ -54,7 +66,18 @@ public class LocalFileStorage implements StorageFacade {
     public void deleteBucket(String bucket) {
         if (bucketExists(bucket)) {
             dbManager.delete(CACHE_BUCKET_PREFIX + bucket);
-            //TODO 修改本地文件夹 bucket 名称，添加 DEL前缀 异步删除 通过localDiskManager
+            //修改本地文件夹 bucket 名称，添加 DEL前缀 通过localDiskManager异步删除
+            for (LocalStorageUnit disk : this.localDiskManager.getDisks()) {
+                Path source = Paths.get(disk.getPath(), bucket);
+                Path target = Paths.get(disk.getPath(), "DEL_" + bucket);
+                if (Files.exists(source)) {
+                    try {
+                        Files.move(source, target);
+                    } catch (Exception e) {
+                        logger.error("删除bucket失败：node_id:{}，node_path:{},bucket={},error_msg:{}", disk.getId(), disk.getPath(), bucket, e.getMessage());
+                    }
+                }
+            }
         }
 
     }
@@ -67,27 +90,117 @@ public class LocalFileStorage implements StorageFacade {
 
     @Override
     public List<BucketMeta> listBuckets() {
-        return Collections.emptyList();
+        List<String> results = dbManager.queryByStartPrefix(CACHE_BUCKET_PREFIX);
+        if (results.size() == 0) {
+            return Collections.emptyList();
+        }
+        return results.stream().map(s -> JsonUtil.fromJson(s, BucketMeta.class)).collect(Collectors.toList());
     }
 
     @Override
     public void putObject(PutObjectRequest request) {
+        String hashKey = request.getBucket() + request.getKey();
+        String hashStr = HashUtils.hexHash(hashKey);
+        LocalStorageUnit unit = localDiskManager.selectUnit(hashKey, LocalDiskManager.WRITE_MODEL);
+        if (unit == null) {
+            throw new ServiceException(ExceptionErrorMsg.FileNoDiskWriteFail);
+        }
+        Path finalPath = Paths.get(unit.getPath(), request.getBucket(), hashStr.substring(0, 2), hashStr.substring(2, 4), hashStr.substring(4, 6), request.getKey());
+        Lock lock = objectLockManager.writeLock(LockKeys.object(request.getBucket(), request.getKey()));
+        lock.lock();
+        //原子操作
+        try {
+            //修改对象状态
+            ObjectMeta meta = new ObjectMeta();
+            meta.setCreateTime(System.currentTimeMillis());
+            meta.setModifiedTime(meta.getCreateTime());
+            meta.setBucketName(request.getBucket());
+            meta.setKey(request.getKey());
+            meta.setStatus(ObjectStatus.PREPARE);
+            dbManager.put(buildObjectKey(meta.getBucketName(), meta.getKey()), JsonUtil.toJson(meta));
 
+            //构建临时文件
+            String tempId = UUID.randomUUID().toString().replace("-", "");
+            Path tempPath = Paths.get(unit.getPath(), request.getBucket(), ".temp", tempId + ".data");
+            if (!Files.exists(tempPath.getParent())) {
+                try {
+                    Files.createDirectories(tempPath.getParent());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            //写入文件
+            LocalDiskManager.WriteResult result = localDiskManager.writeFile(
+                    request.getDataChannel(),
+                    tempPath, 8192,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING
+            );
+
+            try {
+                Files.createDirectories(finalPath.getParent());
+                Files.move(tempPath, finalPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            logger.debug("文件写入成功！data_path={},写入总量={}", finalPath.toString(), result.getTotalSize());
+
+            meta.setSize(result.getTotalSize());
+            meta.setEtag(result.getEtag());
+            meta.setPhysicalPath(finalPath.toString());
+            meta.setStatus(ObjectStatus.VISIBLE);
+            dbManager.put(buildObjectKey(meta.getBucketName(), meta.getKey()), JsonUtil.toJson(meta));
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
     public ObjectReadHandle getObject(GetObjectRequest request) {
-        return null;
+        Lock lock = this.objectLockManager.readLock(LockKeys.object(request.getBucket(), request.getKey()));
+        lock.lock();
+        ObjectMeta meta = headObject(request.getBucket(), request.getKey());
+        if (meta == null) {
+            lock.unlock();
+            return null;
+        }
+        if (meta.getStatus() != ObjectStatus.VISIBLE) {
+            lock.unlock();
+            return null;
+        }
+        return new DefaultObjectReadHandle(meta, request.isHeadOnly(), lock);
     }
 
     @Override
     public ObjectMeta headObject(String bucket, String key) {
-        return null;
+        String meta = dbManager.get(buildObjectKey(bucket, key));
+        if (meta == null) {
+            return null;
+        }
+        return JsonUtil.fromJson(meta, ObjectMeta.class);
     }
 
     @Override
     public void deleteObject(String bucket, String key) {
+        Lock lock = objectLockManager.writeLock(LockKeys.object(bucket, key));
+        lock.lock();
+        try {
+            ObjectMeta meta = headObject(bucket, key);
+            if (meta == null) {
+                lock.unlock();
+                return;
+            }
+            meta.setStatus(ObjectStatus.DELETING);
+            dbManager.put(buildObjectKey(bucket, key), JsonUtil.toJson(meta));
 
+            Files.deleteIfExists(Paths.get(meta.getPhysicalPath()));
+            dbManager.delete(buildObjectKey(bucket, key));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
@@ -97,26 +210,154 @@ public class LocalFileStorage implements StorageFacade {
 
     @Override
     public String initiateMultipartUpload(String bucket, String key) {
-        return "";
+        String uploadId = UUID.randomUUID().toString().replace("-", "");
+        MultipartUploadMeta meta = new MultipartUploadMeta();
+        meta.setUploadId(uploadId);
+        meta.setBucket(bucket);
+        meta.setKey(key);
+        meta.setCreateTime(System.currentTimeMillis());
+
+        String hashKey = bucket + key;
+        LocalStorageUnit unit = localDiskManager.selectUnit(hashKey, LocalDiskManager.WRITE_MODEL);
+        if (unit == null) {
+            throw new ServiceException(ExceptionErrorMsg.FileNoDiskWriteFail);
+        }
+        meta.setDiskPath(unit.getPath());
+        dbManager.put(buildMultiKey(bucket, uploadId), JsonUtil.toJson(meta));
+        return uploadId;
     }
 
     @Override
     public void uploadPart(UploadPartRequest request) {
-
+        MultipartUploadMeta meta = getMultipartUpload(request.getBucketName(), request.getUploadId());
+        Path path = Paths.get(meta.getDiskPath(), meta.getBucket(), ".multipart", meta.getUploadId(), "part." + request.getIndex());
+        try {
+            Files.createDirectories(path.getParent());
+        } catch (Exception e) {
+        }
+        Lock lock = objectLockManager.writeLock(LockKeys.multipart(meta.getBucket(), request.getUploadId()));
+        lock.lock();
+        try {
+            //写入文件
+            LocalDiskManager.WriteResult result = localDiskManager.writeFile(
+                    request.getDataChannel(),
+                    path,
+                    8192,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE,
+                    StandardOpenOption.TRUNCATE_EXISTING
+            );
+            PartMeta partMeta = new PartMeta();
+            partMeta.setPartNumber(request.getIndex());
+            partMeta.setPath(path.toString());
+            partMeta.setEtag(result.getEtag());
+            partMeta.setSize(result.getTotalSize());
+            //重新获取元数据，防止元数据异常
+            meta = getMultipartUpload(request.getBucketName(), request.getUploadId());
+            meta.putPart(request.getIndex(), partMeta);
+            dbManager.put(CACHE_Multi_PREFIX + request.getUploadId(), JsonUtil.toJson(meta));
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
     public void completeMultipartUpload(CompleteMultipartRequest request) {
+        MultipartUploadMeta meta = getMultipartUpload(request.getBucket(), request.getUploadId());
+        if (meta == null) {
+            return;
+        }
+        Lock lock = objectLockManager.writeLock(LockKeys.multipart(meta.getBucket(), request.getUploadId()));
+        Lock objectLock = objectLockManager.writeLock(LockKeys.object(meta.getBucket(), meta.getKey()));
+        objectLock.lock();
+        lock.lock();
+        try {
+            String tempId = UUID.randomUUID().toString().replace("-", "");
+            Path tempPath = Paths.get(meta.getDiskPath(), meta.getBucket(), ".temp", tempId + ".data");
+            List<Path> partPaths = new LinkedList<>();
+            for (Map.Entry<Integer, PartMeta> e : meta.getParts().entrySet()) {
+                Path partPath = Paths.get(e.getValue().getPath());
+                partPaths.add(partPath);
+            }
+            //写入文件
+            LocalDiskManager.WriteResult result = localDiskManager.mergerPart(partPaths, tempPath, 1024 * 10);
+            String hashStr = HashUtils.hexHash(meta.getBucket() + meta.getKey());
+            Path finalPath = Paths.get(meta.getDiskPath(), meta.getBucket(), hashStr.substring(0, 2), hashStr.substring(2, 4), hashStr.substring(4, 6), meta.getKey());
 
+
+            try {
+                Files.createDirectories(finalPath.getParent());
+                Files.move(tempPath, finalPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            ObjectMeta objectMeta = new ObjectMeta();
+            objectMeta.setCreateTime(System.currentTimeMillis());
+            objectMeta.setModifiedTime(meta.getCreateTime());
+            objectMeta.setBucketName(meta.getBucket());
+            objectMeta.setKey(meta.getKey());
+            objectMeta.setSize(result.getTotalSize());
+            objectMeta.setEtag(result.getEtag());
+            objectMeta.setPhysicalPath(finalPath.toString());
+            dbManager.put(buildObjectKey(meta.getBucket(), meta.getKey()), JsonUtil.toJson(objectMeta));
+
+
+            dbManager.delete(buildMultiKey(request.getBucket(), request.getUploadId()));
+        } finally {
+            lock.unlock();
+            objectLock.unlock();
+        }
     }
 
     @Override
-    public void abortMultipartUpload(String uploadId) {
+    public void abortMultipartUpload(String bucket, String uploadId) {
+        MultipartUploadMeta meta = getMultipartUpload(bucket, uploadId);
+        Lock lock = objectLockManager.writeLock(LockKeys.multipart(meta.getBucket(), uploadId));
+        lock.lock();
+        try {
+            dbManager.delete(CACHE_Multi_PREFIX + uploadId);
+            if (meta != null) {
+                Path path = Paths.get(meta.getDiskPath(), meta.getBucket(), ".multipart", meta.getUploadId());
+                try {
+                    Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+                        @Override
+                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                            // 删除文件
+                            Files.delete(file);
+                            return FileVisitResult.CONTINUE;
+                        }
 
+                        @Override
+                        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                            Files.delete(dir);
+                            return FileVisitResult.CONTINUE;
+                        }
+                    });
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
-    public MultipartUploadMeta getMultipartUpload(String uploadId) {
-        return null;
+    public MultipartUploadMeta getMultipartUpload(String bucket, String uploadId) {
+        String meta = dbManager.get(buildMultiKey(bucket, uploadId));
+        if (meta == null) {
+            return null;
+        }
+        return JsonUtil.fromJson(meta, MultipartUploadMeta.class);
     }
+
+    private static String buildObjectKey(String bucketName, String key) {
+        return CACHE_OBJECT_PREFIX + bucketName + "/" + key;
+    }
+
+    private static String buildMultiKey(String bucketName, String uploadId) {
+        return CACHE_Multi_PREFIX + bucketName + "/" + uploadId;
+    }
+
 }

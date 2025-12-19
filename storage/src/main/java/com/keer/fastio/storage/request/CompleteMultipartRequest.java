@@ -6,4 +6,22 @@ package com.keer.fastio.storage.request;
  * @description:
  */
 public class CompleteMultipartRequest {
+    private String uploadId;
+    private String bucket;
+
+    public String getBucket() {
+        return bucket;
+    }
+
+    public void setBucket(String bucket) {
+        this.bucket = bucket;
+    }
+
+    public String getUploadId() {
+        return uploadId;
+    }
+
+    public void setUploadId(String uploadId) {
+        this.uploadId = uploadId;
+    }
 }

@@ -111,9 +111,10 @@ public interface StorageFacade {
     /**
      * 终止断点续传
      *
+     * @param bucket
      * @param uploadId
      */
-    void abortMultipartUpload(String uploadId);
+    void abortMultipartUpload(String bucket,String uploadId);
 
     /**
      * 获取断点续传元数据
@@ -121,5 +122,5 @@ public interface StorageFacade {
      * @param uploadId
      * @return
      */
-    MultipartUploadMeta getMultipartUpload(String uploadId);
+    MultipartUploadMeta getMultipartUpload(String bucket, String uploadId);
 }

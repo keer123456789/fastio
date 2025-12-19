@@ -1,6 +1,6 @@
 package com.keer.fastio.common.entity;
 
-import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * @author 张经伦
@@ -11,8 +11,17 @@ public class MultipartUploadMeta {
     private String uploadId;
     private String bucket;
     private String key;
-    private Map<Integer, PartMeta> parts;
+    private TreeMap<Integer, PartMeta> parts;
+    private String diskPath;
     private long createTime;
+
+    public String getDiskPath() {
+        return diskPath;
+    }
+
+    public void setDiskPath(String diskPath) {
+        this.diskPath = diskPath;
+    }
 
     public String getUploadId() {
         return uploadId;
@@ -38,11 +47,11 @@ public class MultipartUploadMeta {
         this.key = key;
     }
 
-    public Map<Integer, PartMeta> getParts() {
+    public TreeMap<Integer, PartMeta> getParts() {
         return parts;
     }
 
-    public void setParts(Map<Integer, PartMeta> parts) {
+    public void setParts(TreeMap<Integer, PartMeta> parts) {
         this.parts = parts;
     }
 
@@ -52,5 +61,13 @@ public class MultipartUploadMeta {
 
     public void setCreateTime(long createTime) {
         this.createTime = createTime;
+    }
+
+
+    public void putPart(int index, PartMeta meta) {
+        if (this.parts == null) {
+            parts = new TreeMap<>();
+        }
+        this.parts.put(index, meta);
     }
 }

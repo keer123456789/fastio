@@ -11,7 +11,7 @@ public class PartMeta {
     private int partNumber;
     private String etag;
     private long size;
-    private Path path;
+    private String path;
 
     public int getPartNumber() {
         return partNumber;
@@ -37,11 +37,11 @@ public class PartMeta {
         this.size = size;
     }
 
-    public Path getPath() {
+    public String getPath() {
         return path;
     }
 
-    public void setPath(Path path) {
+    public void setPath(String path) {
         this.path = path;
     }
 }

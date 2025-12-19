@@ -26,16 +26,13 @@ public interface ObjectReadHandle extends AutoCloseable {
      */
     ReadableByteChannel openChannel();
 
-    /**
-     * 方式 2：InputStream（兼容）
-     */
-    InputStream openStream();
+
 
     /**
-     * 方式 3：零拷贝（Netty / sendfile）
+     * 方式 2：零拷贝（Netty / sendfile）
      * TODO 之后做
      */
-    boolean supportsZeroCopy();
+//    boolean supportsZeroCopy();
 //    ZeroCopyRegion zeroCopyRegion();
 
     // ===== 生命周期 =====

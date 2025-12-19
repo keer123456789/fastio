@@ -1,5 +1,7 @@
 package com.keer.fastio.common.entity;
 
+import com.keer.fastio.common.enums.ObjectStatus;
+
 /**
  * @author 张经伦
  * @date 2025/12/14 15:47
@@ -34,6 +36,18 @@ public class ObjectMeta {
      * 最后一次修改时间
      */
     private Long modifiedTime;
+    /**
+     * 对象状态
+     */
+    private ObjectStatus status;
+
+    public ObjectStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(ObjectStatus status) {
+        this.status = status;
+    }
 
     public String getBucketName() {
         return bucketName;
