@@ -1,5 +1,6 @@
 package com.keer.fastio.storage;
 
+import com.keer.fastio.common.constant.Constants;
 import com.keer.fastio.common.entity.BucketMeta;
 import com.keer.fastio.common.entity.MultipartUploadMeta;
 import com.keer.fastio.common.entity.ObjectMeta;
@@ -12,8 +13,11 @@ import com.keer.fastio.common.utils.HashUtils;
 import com.keer.fastio.common.utils.JsonUtil;
 import com.keer.fastio.storage.entity.LocalStorageUnit;
 import com.keer.fastio.storage.entity.LockKeys;
-import com.keer.fastio.storage.handler.DefaultObjectReadHandle;
-import com.keer.fastio.storage.handler.ObjectReadHandle;
+import com.keer.fastio.storage.handle.ObjectWriteHandle;
+import com.keer.fastio.storage.handle.read.DefaultObjectReadHandle;
+import com.keer.fastio.storage.handle.ObjectReadHandle;
+import com.keer.fastio.storage.handle.write.DefaultObjectWriteHandle;
+import com.keer.fastio.storage.handle.write.DefaultPartWriteHandle;
 import com.keer.fastio.storage.manager.LocalDiskManager;
 import com.keer.fastio.storage.manager.ObjectLockManager;
 import com.keer.fastio.storage.manager.RocksDbManager;
@@ -22,6 +26,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
@@ -35,9 +42,7 @@ import java.util.stream.Collectors;
  */
 public class LocalFileStorage implements StorageFacade {
     private static final Logger logger = LoggerFactory.getLogger(LocalFileStorage.class);
-    private static final String CACHE_BUCKET_PREFIX = "bucket_";
-    private static final String CACHE_OBJECT_PREFIX = "object_";
-    private static final String CACHE_Multi_PREFIX = "multi_";
+
     private LocalDiskManager localDiskManager;
     private RocksDbManager dbManager;
     private ObjectLockManager objectLockManager;
@@ -59,13 +64,13 @@ public class LocalFileStorage implements StorageFacade {
         bucketMeta.setName(bucket);
         bucketMeta.setCreateTime(System.currentTimeMillis());
         String jsonValue = JsonUtil.toJson(bucketMeta);
-        dbManager.put(CACHE_BUCKET_PREFIX + bucket, jsonValue);
+        dbManager.put(Constants.CACHE_BUCKET_PREFIX + bucket, jsonValue);
     }
 
     @Override
     public void deleteBucket(String bucket) {
         if (bucketExists(bucket)) {
-            dbManager.delete(CACHE_BUCKET_PREFIX + bucket);
+            dbManager.delete(Constants.CACHE_BUCKET_PREFIX + bucket);
             //修改本地文件夹 bucket 名称，添加 DEL前缀 通过localDiskManager异步删除
             for (LocalStorageUnit disk : this.localDiskManager.getDisks()) {
                 Path source = Paths.get(disk.getPath(), bucket);
@@ -90,15 +95,16 @@ public class LocalFileStorage implements StorageFacade {
 
     @Override
     public List<BucketMeta> listBuckets() {
-        List<String> results = dbManager.queryByStartPrefix(CACHE_BUCKET_PREFIX);
+        List<String> results = dbManager.queryByStartPrefix(Constants.CACHE_BUCKET_PREFIX);
         if (results.size() == 0) {
             return Collections.emptyList();
         }
         return results.stream().map(s -> JsonUtil.fromJson(s, BucketMeta.class)).collect(Collectors.toList());
     }
 
+
     @Override
-    public void putObject(PutObjectRequest request) {
+    public ObjectWriteHandle putObject(PutObjectRequest request) {
         String hashKey = request.getBucket() + request.getKey();
         String hashStr = HashUtils.hexHash(hashKey);
         LocalStorageUnit unit = localDiskManager.selectUnit(hashKey, LocalDiskManager.WRITE_MODEL);
@@ -108,7 +114,6 @@ public class LocalFileStorage implements StorageFacade {
         Path finalPath = Paths.get(unit.getPath(), request.getBucket(), hashStr.substring(0, 2), hashStr.substring(2, 4), hashStr.substring(4, 6), request.getKey());
         Lock lock = objectLockManager.writeLock(LockKeys.object(request.getBucket(), request.getKey()));
         lock.lock();
-        //原子操作
         try {
             //修改对象状态
             ObjectMeta meta = new ObjectMeta();
@@ -116,6 +121,7 @@ public class LocalFileStorage implements StorageFacade {
             meta.setModifiedTime(meta.getCreateTime());
             meta.setBucketName(request.getBucket());
             meta.setKey(request.getKey());
+            meta.setPhysicalPath(finalPath.toString());
             meta.setStatus(ObjectStatus.PREPARE);
             dbManager.put(buildObjectKey(meta.getBucketName(), meta.getKey()), JsonUtil.toJson(meta));
 
@@ -129,31 +135,14 @@ public class LocalFileStorage implements StorageFacade {
                     throw new RuntimeException(e);
                 }
             }
-            //写入文件
-            LocalDiskManager.WriteResult result = localDiskManager.writeFile(
-                    request.getDataChannel(),
-                    tempPath, 8192,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.TRUNCATE_EXISTING
-            );
 
-            try {
-                Files.createDirectories(finalPath.getParent());
-                Files.move(tempPath, finalPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-            logger.debug("文件写入成功！data_path={},写入总量={}", finalPath.toString(), result.getTotalSize());
+            return new DefaultObjectWriteHandle(tempPath, lock, meta);
+        } catch (Exception e) {
 
-            meta.setSize(result.getTotalSize());
-            meta.setEtag(result.getEtag());
-            meta.setPhysicalPath(finalPath.toString());
-            meta.setStatus(ObjectStatus.VISIBLE);
-            dbManager.put(buildObjectKey(meta.getBucketName(), meta.getKey()), JsonUtil.toJson(meta));
         } finally {
             lock.unlock();
         }
+        return null;
     }
 
     @Override
@@ -228,7 +217,7 @@ public class LocalFileStorage implements StorageFacade {
     }
 
     @Override
-    public void uploadPart(UploadPartRequest request) {
+    public ObjectWriteHandle uploadPart(UploadPartRequest request) {
         MultipartUploadMeta meta = getMultipartUpload(request.getBucketName(), request.getUploadId());
         Path path = Paths.get(meta.getDiskPath(), meta.getBucket(), ".multipart", meta.getUploadId(), "part." + request.getIndex());
         try {
@@ -238,26 +227,10 @@ public class LocalFileStorage implements StorageFacade {
         Lock lock = objectLockManager.writeLock(LockKeys.multipart(meta.getBucket(), request.getUploadId()));
         lock.lock();
         try {
-            //写入文件
-            LocalDiskManager.WriteResult result = localDiskManager.writeFile(
-                    request.getDataChannel(),
-                    path,
-                    8192,
-                    StandardOpenOption.CREATE,
-                    StandardOpenOption.WRITE,
-                    StandardOpenOption.TRUNCATE_EXISTING
-            );
-            PartMeta partMeta = new PartMeta();
-            partMeta.setPartNumber(request.getIndex());
-            partMeta.setPath(path.toString());
-            partMeta.setEtag(result.getEtag());
-            partMeta.setSize(result.getTotalSize());
-            //重新获取元数据，防止元数据异常
-            meta = getMultipartUpload(request.getBucketName(), request.getUploadId());
-            meta.putPart(request.getIndex(), partMeta);
-            dbManager.put(CACHE_Multi_PREFIX + request.getUploadId(), JsonUtil.toJson(meta));
-        } finally {
+            return new DefaultPartWriteHandle(path,request.getIndex(),lock,meta);
+        } catch (Exception e){
             lock.unlock();
+            throw new RuntimeException(e);
         }
     }
 
@@ -316,7 +289,7 @@ public class LocalFileStorage implements StorageFacade {
         Lock lock = objectLockManager.writeLock(LockKeys.multipart(meta.getBucket(), uploadId));
         lock.lock();
         try {
-            dbManager.delete(CACHE_Multi_PREFIX + uploadId);
+            dbManager.delete(Constants.CACHE_Multi_PREFIX + uploadId);
             if (meta != null) {
                 Path path = Paths.get(meta.getDiskPath(), meta.getBucket(), ".multipart", meta.getUploadId());
                 try {
@@ -353,11 +326,11 @@ public class LocalFileStorage implements StorageFacade {
     }
 
     private static String buildObjectKey(String bucketName, String key) {
-        return CACHE_OBJECT_PREFIX + bucketName + "/" + key;
+        return Constants.CACHE_OBJECT_PREFIX + bucketName + "/" + key;
     }
 
     private static String buildMultiKey(String bucketName, String uploadId) {
-        return CACHE_Multi_PREFIX + bucketName + "/" + uploadId;
+        return Constants.CACHE_Multi_PREFIX + bucketName + "/" + uploadId;
     }
 
 }

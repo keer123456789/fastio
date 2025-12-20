@@ -17,7 +17,6 @@ public class PutObjectRequest {
     private String key;
 
     // ===== 数据输入 =====
-    private ReadableByteChannel dataChannel;
     private Long contentLength; // 可选（HTTP 会有）
 
     // ===== 校验 =====
@@ -51,13 +50,7 @@ public class PutObjectRequest {
         this.key = key;
     }
 
-    public ReadableByteChannel getDataChannel() {
-        return dataChannel;
-    }
 
-    public void setDataChannel(ReadableByteChannel dataChannel) {
-        this.dataChannel = dataChannel;
-    }
 
     public Long getContentLength() {
         return contentLength;

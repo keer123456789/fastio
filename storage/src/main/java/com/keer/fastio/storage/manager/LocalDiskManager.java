@@ -1,6 +1,6 @@
 package com.keer.fastio.storage.manager;
 
-import com.keer.fastio.common.entity.PartMeta;
+import com.keer.fastio.common.config.StorageUnitConfig;
 import com.keer.fastio.common.enums.ExceptionErrorMsg;
 import com.keer.fastio.common.exception.ServiceException;
 import com.keer.fastio.common.manager.AbstractResourceManager;
@@ -68,8 +68,10 @@ public class LocalDiskManager extends AbstractResourceManager {
      */
     public static final int WRITE_MODEL = 1;
 
-    public LocalDiskManager(List<LocalStorageUnit> units) {
-        disks = units;
+    public LocalDiskManager(List<StorageUnitConfig> units) {
+        disks = units.stream().map(u ->
+             new LocalStorageUnit(u.getId(), u.getPath())
+        ).collect(Collectors.toList());
         refreshDiskStatus();
         refreshRing(READ_MODEL);
         refreshRing(WRITE_MODEL);
@@ -302,6 +304,7 @@ public class LocalDiskManager extends AbstractResourceManager {
 
     /**
      * 合并分片文件
+     *
      * @param partPaths
      * @param destPath
      * @param bufferSize

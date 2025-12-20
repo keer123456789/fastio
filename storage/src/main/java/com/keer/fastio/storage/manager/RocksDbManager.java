@@ -1,5 +1,6 @@
 package com.keer.fastio.storage.manager;
 
+import com.keer.fastio.common.config.RockDbConfig;
 import com.keer.fastio.common.manager.AbstractResourceManager;
 import com.keer.fastio.common.utils.ByteUtils;
 import org.rocksdb.*;
@@ -24,8 +25,8 @@ public class RocksDbManager extends AbstractResourceManager {
     private RocksDB db;
     private static final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-    public RocksDbManager(String dbpath) {
-        this.dbpath = dbpath;
+    public RocksDbManager(RockDbConfig config) {
+        this.dbpath = config.getPath();
     }
 
     @Override

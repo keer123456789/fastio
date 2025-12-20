@@ -1,8 +1,7 @@
-package com.keer.fastio.storage.handler;
+package com.keer.fastio.storage.handle;
 
 import com.keer.fastio.common.entity.ObjectMeta;
 
-import java.io.InputStream;
 import java.nio.channels.ReadableByteChannel;
 
 /**

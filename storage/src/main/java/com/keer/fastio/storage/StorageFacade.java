@@ -3,9 +3,11 @@ package com.keer.fastio.storage;
 import com.keer.fastio.common.entity.BucketMeta;
 import com.keer.fastio.common.entity.MultipartUploadMeta;
 import com.keer.fastio.common.entity.ObjectMeta;
-import com.keer.fastio.storage.handler.ObjectReadHandle;
+import com.keer.fastio.storage.handle.ObjectReadHandle;
+import com.keer.fastio.storage.handle.ObjectWriteHandle;
 import com.keer.fastio.storage.request.*;
 
+import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 
 /**
@@ -46,14 +48,7 @@ public interface StorageFacade {
     List<BucketMeta> listBuckets();
 
     // Object
-
-    /**
-     * 存储对象
-     *
-     * @param request
-     */
-    void putObject(PutObjectRequest request);
-
+    ObjectWriteHandle putObject(PutObjectRequest req);
     /**
      * 获取对象
      *
@@ -98,7 +93,7 @@ public interface StorageFacade {
      *
      * @param request
      */
-    void uploadPart(UploadPartRequest request);
+    ObjectWriteHandle uploadPart(UploadPartRequest request);
 
     /**
      * 完成断点续传
