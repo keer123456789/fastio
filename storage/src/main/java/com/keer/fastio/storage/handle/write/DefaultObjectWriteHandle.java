@@ -43,7 +43,7 @@ public class DefaultObjectWriteHandle implements ObjectWriteHandle<ObjectMeta> {
 
 
     @Override
-    public ObjectMeta commit() {
+    public ObjectMeta commit(long total,String eTag) {
         if (commitOrAbort) {
             throw new IllegalStateException("ObjectWriteHandle has already been committed or aborted");
         }

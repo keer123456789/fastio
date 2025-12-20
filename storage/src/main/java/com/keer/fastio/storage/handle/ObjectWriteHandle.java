@@ -2,6 +2,7 @@ package com.keer.fastio.storage.handle;
 
 import com.keer.fastio.common.entity.ObjectMeta;
 
+import java.io.IOException;
 import java.nio.channels.WritableByteChannel;
 
 /**
@@ -13,7 +14,7 @@ public interface  ObjectWriteHandle<T> extends AutoCloseable {
     /* push 模式 */
     WritableByteChannel openWriteChannel();
 
-    T commit();
+    T commit(long total,String eTag) throws IOException;
 
     void abort();
 

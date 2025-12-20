@@ -47,7 +47,7 @@ public class DefaultPartWriteHandle implements ObjectWriteHandle<MultipartUpload
     }
 
     @Override
-    public MultipartUploadMeta commit() {
+    public MultipartUploadMeta commit(long total, String eTag) {
         if (commitOrAbort) {
             throw new IllegalStateException("ObjectWriteHandle has already been committed or aborted");
         }
@@ -55,8 +55,8 @@ public class DefaultPartWriteHandle implements ObjectWriteHandle<MultipartUpload
             PartMeta partMeta = new PartMeta();
             partMeta.setPartNumber(index);
             partMeta.setPath(partPath.toString());
-//        partMeta.setEtag(result.getEtag());
-            partMeta.setSize(Files.size(partPath));
+            partMeta.setEtag(eTag);
+            partMeta.setSize(total);
             String key = Constants.CACHE_Multi_PREFIX + meta.getBucket() + "/" + meta.getUploadId();
             //重新获取元数据，防止元数据异常
             meta = JsonUtil.fromJson(rocksDbManager.get(key), MultipartUploadMeta.class);
