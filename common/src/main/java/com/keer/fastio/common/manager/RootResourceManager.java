@@ -1,5 +1,7 @@
 package com.keer.fastio.common.manager;
 
+import com.keer.fastio.common.config.FastIoConfig;
+
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -17,6 +19,8 @@ public class RootResourceManager implements Manager {
     private static RootResourceManager instance = new RootResourceManager();
     private final List<AbstractResourceManager> initializationOrder = new ArrayList<>();
     private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    private FastIoConfig config;
 
     private RootResourceManager() {
     }
@@ -114,5 +118,13 @@ public class RootResourceManager implements Manager {
     @SuppressWarnings("unchecked")
     public <T extends AbstractResourceManager> T getManager(Class<T> tClass) {
         return (T) map.get(tClass);
+    }
+
+    public FastIoConfig getConfig() {
+        return config;
+    }
+
+    public void setConfig(FastIoConfig config) {
+        this.config = config;
     }
 }
