@@ -3,6 +3,7 @@ package com.keer.fastio.storage.handle.write;
 import com.keer.fastio.common.constant.Constants;
 import com.keer.fastio.common.entity.ObjectMeta;
 import com.keer.fastio.common.enums.ObjectStatus;
+import com.keer.fastio.common.lock.LockLease;
 import com.keer.fastio.common.manager.RootResourceManager;
 import com.keer.fastio.common.utils.JsonUtil;
 import com.keer.fastio.storage.handle.ObjectWriteHandle;
@@ -22,13 +23,13 @@ public class DefaultObjectWriteHandle implements ObjectWriteHandle<ObjectMeta> {
 
     private WritableByteChannel channel;
     //对象锁
-    private Lock lock;
+    private LockLease lock;
     private ObjectMeta meta;
     private Path tempPath;
     private RocksDbManager rocksDbManager;
     private boolean commitOrAbort=false;
 
-    public DefaultObjectWriteHandle(Path tempPath, Lock lock, ObjectMeta meta) throws IOException {
+    public DefaultObjectWriteHandle(Path tempPath, LockLease lock, ObjectMeta meta) throws IOException {
         this.tempPath = tempPath;
         this.lock = lock;
         this.meta = meta;
@@ -64,6 +65,7 @@ public class DefaultObjectWriteHandle implements ObjectWriteHandle<ObjectMeta> {
             throw new RuntimeException(e);
         }finally {
             this.lock.unlock();
+            this.lock.release();
         }
     }
 
@@ -79,6 +81,7 @@ public class DefaultObjectWriteHandle implements ObjectWriteHandle<ObjectMeta> {
         } catch (IOException ignored) {
         }
         this.lock.unlock();
+        this.lock.release();
     }
 
     @Override

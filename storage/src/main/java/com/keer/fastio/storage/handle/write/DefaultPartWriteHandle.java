@@ -2,8 +2,8 @@ package com.keer.fastio.storage.handle.write;
 
 import com.keer.fastio.common.constant.Constants;
 import com.keer.fastio.common.entity.MultipartUploadMeta;
-import com.keer.fastio.common.entity.ObjectMeta;
 import com.keer.fastio.common.entity.PartMeta;
+import com.keer.fastio.common.lock.LockLease;
 import com.keer.fastio.common.manager.RootResourceManager;
 import com.keer.fastio.common.utils.JsonUtil;
 import com.keer.fastio.storage.handle.ObjectWriteHandle;
@@ -14,7 +14,6 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.concurrent.locks.Lock;
 
 /**
  * @author 张经伦
@@ -24,14 +23,14 @@ import java.util.concurrent.locks.Lock;
 public class DefaultPartWriteHandle implements ObjectWriteHandle<MultipartUploadMeta> {
     private WritableByteChannel channel;
     //对象锁
-    private Lock lock;
+    private LockLease lock;
     private MultipartUploadMeta meta;
     private Path partPath;
     private RocksDbManager rocksDbManager;
     private boolean commitOrAbort = false;
     private int index;
 
-    public DefaultPartWriteHandle(Path partPath, int index, Lock lock, MultipartUploadMeta meta) throws IOException {
+    public DefaultPartWriteHandle(Path partPath, int index, LockLease lock, MultipartUploadMeta meta) throws IOException {
         this.partPath = partPath;
         this.index = index;
         this.lock = lock;
@@ -66,6 +65,7 @@ public class DefaultPartWriteHandle implements ObjectWriteHandle<MultipartUpload
             throw new RuntimeException(e);
         } finally {
             this.lock.unlock();
+            this.lock.release();
         }
         return meta;
     }
@@ -83,6 +83,7 @@ public class DefaultPartWriteHandle implements ObjectWriteHandle<MultipartUpload
         } catch (IOException ignored) {
         }
         this.lock.unlock();
+        this.lock.release();
     }
 
     @Override

@@ -1,6 +1,7 @@
 package com.keer.fastio.storage.handle.read;
 
 import com.keer.fastio.common.entity.ObjectMeta;
+import com.keer.fastio.common.lock.LockLease;
 import com.keer.fastio.storage.handle.ObjectReadHandle;
 
 import java.nio.channels.FileChannel;
@@ -19,9 +20,9 @@ public class DefaultObjectReadHandle implements ObjectReadHandle {
     private boolean isOnlyMeta;
 
     private ReadableByteChannel channel;
-    private Lock readLock;
+    private LockLease readLock;
 
-    public DefaultObjectReadHandle(ObjectMeta meta, boolean isOnlyMeta, Lock readLock) {
+    public DefaultObjectReadHandle(ObjectMeta meta, boolean isOnlyMeta, LockLease readLock) {
         this.meta = meta;
         this.isOnlyMeta = isOnlyMeta;
         this.readLock = readLock;
@@ -63,6 +64,7 @@ public class DefaultObjectReadHandle implements ObjectReadHandle {
         } catch (Exception e) {
         } finally {
             readLock.unlock();
+            readLock.release();
         }
     }
 }

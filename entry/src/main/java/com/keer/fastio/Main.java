@@ -8,7 +8,7 @@ import com.keer.fastio.common.manager.RootResourceManager;
 import com.keer.fastio.storage.LocalFileStorage;
 import com.keer.fastio.storage.StorageFacade;
 import com.keer.fastio.storage.manager.LocalDiskManager;
-import com.keer.fastio.storage.manager.ObjectLockManager;
+import com.keer.fastio.common.lock.ObjectLockManager;
 import com.keer.fastio.storage.manager.RocksDbManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +16,6 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 
 public class Main {
