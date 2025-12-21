@@ -80,6 +80,7 @@ public class LocalFileStorage implements StorageFacade {
                         Files.move(source, target);
                     } catch (Exception e) {
                         logger.error("删除bucket失败：node_id:{}，node_path:{},bucket={},error_msg:{}", disk.getId(), disk.getPath(), bucket, e.getMessage());
+                        throw new ServiceException(e);
                     }
                 }
             }
@@ -132,17 +133,17 @@ public class LocalFileStorage implements StorageFacade {
                 try {
                     Files.createDirectories(tempPath.getParent());
                 } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    throw new ServiceException(e);
                 }
             }
 
             return new DefaultObjectWriteHandle(tempPath, lock, meta);
         } catch (Exception e) {
-
+            throw new ServiceException(e);
         } finally {
             lock.unlock();
         }
-        return null;
+
     }
 
     @Override
@@ -186,7 +187,7 @@ public class LocalFileStorage implements StorageFacade {
             Files.deleteIfExists(Paths.get(meta.getPhysicalPath()));
             dbManager.delete(buildObjectKey(bucket, key));
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new ServiceException(e);
         } finally {
             lock.unlock();
         }
@@ -223,6 +224,7 @@ public class LocalFileStorage implements StorageFacade {
         try {
             Files.createDirectories(path.getParent());
         } catch (Exception e) {
+            throw new ServiceException(e);
         }
         Lock lock = objectLockManager.writeLock(LockKeys.multipart(meta.getBucket(), request.getUploadId()));
         lock.lock();
@@ -262,7 +264,7 @@ public class LocalFileStorage implements StorageFacade {
                 Files.createDirectories(finalPath.getParent());
                 Files.move(tempPath, finalPath, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             } catch (Exception e) {
-                throw new RuntimeException(e);
+                throw new ServiceException(e);
             }
 
             ObjectMeta objectMeta = new ObjectMeta();
@@ -308,7 +310,7 @@ public class LocalFileStorage implements StorageFacade {
                         }
                     });
                 } catch (Exception e) {
-                    throw new RuntimeException(e);
+                    throw new ServiceException(e);
                 }
             }
         } finally {
