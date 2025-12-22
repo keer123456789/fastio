@@ -13,7 +13,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 
 import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -21,16 +20,16 @@ import java.security.NoSuchAlgorithmException;
 /**
  * @author 张经伦
  * @date 2025/12/20 10:42
- * @description:
+ * @description: 对象任务
  */
-public class DataObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
+public class ObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
     private final StorageFacade storageFacade;
     private long receivedBytes = 0;
     private ObjectWriteHandle<ObjectMeta> writeHandle;
     private WritableByteChannel writeChannel;
     private MessageDigest md5 = null;
 
-    public DataObjectHandler(StorageFacade facade) {
+    public ObjectHandler(StorageFacade facade) {
         this.storageFacade = facade;
     }
 
@@ -91,7 +90,7 @@ public class DataObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
         try {
             // ⚠️ 零拷贝写入
             buf.readBytes(Channels.newOutputStream(writeChannel), readable);
-        }catch (Exception e){
+        } catch (Exception e) {
             //TODO
         }
         if (content instanceof LastHttpContent) {
@@ -133,18 +132,13 @@ public class DataObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
     }
 
     private void sendOk(ChannelHandlerContext ctx, String msg) {
-        FullHttpResponse resp = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
-                ctx.alloc().buffer().writeBytes(msg.getBytes())
-        );
+        FullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, ctx.alloc().buffer().writeBytes(msg.getBytes()));
         resp.headers().set(HttpHeaderNames.CONTENT_LENGTH, resp.content().readableBytes());
         ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
     }
 
     private void sendError(ChannelHandlerContext ctx, HttpResponseStatus status) {
-        FullHttpResponse resp = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1, status
-        );
+        FullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, status);
         ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
     }
 }

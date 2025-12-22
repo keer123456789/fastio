@@ -2,7 +2,7 @@ package com.keer.fastio.api.handler;
 
 
 import com.keer.fastio.api.handler.admin.AdminHandler;
-import com.keer.fastio.api.handler.data.DataObjectHandler;
+import com.keer.fastio.api.handler.data.ObjectHandler;
 import com.keer.fastio.storage.StorageFacade;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -30,9 +30,10 @@ public class RouterHandler extends SimpleChannelInboundHandler<HttpRequest> {
         ChannelPipeline p = ctx.pipeline();
 
         p.remove(this);
-
-        if (path.startsWith("/data/")) {
-            p.addLast(new DataObjectHandler(facade));
+        if (path.startsWith("/data/multi/")) {
+            p.addLast(new ObjectHandler(facade));
+        } else if (path.startsWith("/data/")) {
+            p.addLast(new ObjectHandler(facade));
         } else if (path.startsWith("/admin/")) {
             p.addLast(new HttpObjectAggregator(1024 * 1024));
             p.addLast(new AdminHandler(facade));
