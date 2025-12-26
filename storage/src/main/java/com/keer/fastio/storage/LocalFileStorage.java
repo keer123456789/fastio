@@ -85,6 +85,13 @@ public class LocalFileStorage implements StorageFacade {
 
     }
 
+    @Override
+    public BucketMeta headBucket(String bucket) {
+        if (bucketExists(bucket)) {
+            return JsonUtil.fromJson(dbManager.get(Constants.CACHE_BUCKET_PREFIX + bucket), BucketMeta.class);
+        }
+        return null;
+    }
 
     @Override
     public boolean bucketExists(String bucket) {
@@ -190,7 +197,13 @@ public class LocalFileStorage implements StorageFacade {
     }
 
     @Override
-    public List<ObjectMeta> listObjects(ListObjectsRequest request) {
+    public List<ObjectMeta> listObjects(ListObjectsRequest request) throws ServiceException {
+        if (request.getBucket() == null || request.getBucket().equals("")) {
+            throw new ServiceException(ExceptionErrorMsg.BucketIsNull);
+        }
+
+
+
         return Collections.emptyList();
     }
 
@@ -225,8 +238,8 @@ public class LocalFileStorage implements StorageFacade {
         LockLease lock = objectLockManager.acquireWriteLock(LockKeys.multipart(meta.getBucket(), request.getUploadId()));
         lock.lock();
         try {
-            return new DefaultPartWriteHandle(path,request.getIndex(),lock,meta);
-        } catch (Exception e){
+            return new DefaultPartWriteHandle(path, request.getIndex(), lock, meta);
+        } catch (Exception e) {
             lock.unlock();
             throw new RuntimeException(e);
         }

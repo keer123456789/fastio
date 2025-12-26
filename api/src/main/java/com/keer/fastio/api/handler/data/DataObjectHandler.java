@@ -22,14 +22,14 @@ import java.security.NoSuchAlgorithmException;
  * @date 2025/12/20 10:42
  * @description: 对象任务
  */
-public class ObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
+public class DataObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
     private final StorageFacade storageFacade;
     private long receivedBytes = 0;
     private ObjectWriteHandle<ObjectMeta> writeHandle;
     private WritableByteChannel writeChannel;
     private MessageDigest md5 = null;
 
-    public ObjectHandler(StorageFacade facade) {
+    public DataObjectHandler(StorageFacade facade) {
         this.storageFacade = facade;
     }
 
@@ -47,7 +47,7 @@ public class ObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
 
     private void handleRequest(ChannelHandlerContext ctx, HttpRequest req) {
         if (req.method() == HttpMethod.PUT) {
-            receivedBytes = 0;
+            handlePut(ctx,req);
 
         } else if (req.method() == HttpMethod.GET) {
             sendSimpleResponse(ctx, "GET OK: " + req.uri());

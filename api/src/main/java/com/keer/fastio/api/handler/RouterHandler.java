@@ -2,13 +2,15 @@ package com.keer.fastio.api.handler;
 
 
 import com.keer.fastio.api.handler.admin.AdminHandler;
-import com.keer.fastio.api.handler.data.ObjectHandler;
+import com.keer.fastio.api.handler.data.DataObjectHandler;
+import com.keer.fastio.api.utils.RouterHandlerUtils;
 import com.keer.fastio.storage.StorageFacade;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.QueryStringDecoder;
 
 
 /**
@@ -30,26 +32,17 @@ public class RouterHandler extends SimpleChannelInboundHandler<HttpRequest> {
         ChannelPipeline p = ctx.pipeline();
 
         p.remove(this);
-        if (path.startsWith("/data/multi/")) {
-            p.addLast(new ObjectHandler(facade));
-        } else if (path.startsWith("/data/")) {
-            p.addLast(new ObjectHandler(facade));
+        if (path.startsWith("/data/")) {
+            p.addLast(new DataObjectHandler(facade));
         } else if (path.startsWith("/admin/")) {
             p.addLast(new HttpObjectAggregator(1024 * 1024));
             p.addLast(new AdminHandler(facade));
         } else {
-            send404(ctx);
+            RouterHandlerUtils.send404(ctx);
             return;
         }
 
         ctx.fireChannelRead(req);
     }
 
-    private void send404(ChannelHandlerContext ctx) {
-        FullHttpResponse resp = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1,
-                HttpResponseStatus.NOT_FOUND
-        );
-        ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
-    }
 }

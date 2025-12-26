@@ -33,6 +33,14 @@ public interface StorageFacade {
     void deleteBucket(String bucket) throws ServiceException;
 
     /**
+     * 获取桶信息
+     *
+     * @param bucket
+     * @return
+     */
+    BucketMeta headBucket(String bucket);
+
+    /**
      * 判断桶是否存在
      *
      * @param bucket
@@ -76,7 +84,7 @@ public interface StorageFacade {
     void deleteObject(String bucket, String key) throws ServiceException;
 
     // Listing
-    List<ObjectMeta> listObjects(ListObjectsRequest request);
+    List<ObjectMeta> listObjects(ListObjectsRequest request) throws ServiceException;
 
     // Multipart
 

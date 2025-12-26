@@ -10,7 +10,7 @@ public enum ExceptionErrorMsg {
 
 
     BucketExists("3100", "bucket already exists"),
-
+    BucketIsNull("3101", "bucket is null or empty"),
 
     FileCreatFail("3400", "file/dir creation fail"),
     FileNoDiskWriteFail("3401", "file no disk write "),
