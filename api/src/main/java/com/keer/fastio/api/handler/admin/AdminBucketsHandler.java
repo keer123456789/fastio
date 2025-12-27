@@ -4,6 +4,7 @@ import com.keer.fastio.api.entity.PathInfo;
 import com.keer.fastio.api.entity.Result;
 import com.keer.fastio.api.utils.RouterHandlerUtils;
 import com.keer.fastio.common.entity.BucketMeta;
+import com.keer.fastio.common.exception.ServiceException;
 import com.keer.fastio.common.utils.JsonUtil;
 import com.keer.fastio.storage.StorageFacade;
 import io.netty.channel.ChannelHandlerContext;
@@ -28,17 +29,23 @@ public class AdminBucketsHandler extends SimpleChannelInboundHandler<FullHttpReq
 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, FullHttpRequest fullHttpRequest) throws Exception {
-        String path = new QueryStringDecoder(fullHttpRequest.uri()).path();
-        PathInfo info = new PathInfo(path);
-        if (fullHttpRequest.method() == HttpMethod.PUT) {
-            handlePut(channelHandlerContext, fullHttpRequest, info);
-        } else if (fullHttpRequest.method() == HttpMethod.GET) {
-            handleDelete(channelHandlerContext, fullHttpRequest, info);
-        } else if (fullHttpRequest.method() == HttpMethod.DELETE) {
-            handleGet(channelHandlerContext, fullHttpRequest, info);
-        } else {
-            RouterHandlerUtils.send405(channelHandlerContext);
+        try {
+            String path = new QueryStringDecoder(fullHttpRequest.uri()).path();
+            PathInfo info = new PathInfo(path);
+            if (fullHttpRequest.method() == HttpMethod.PUT) {
+                handlePut(channelHandlerContext, fullHttpRequest, info);
+            } else if (fullHttpRequest.method() == HttpMethod.DELETE) {
+                handleDelete(channelHandlerContext, fullHttpRequest, info);
+            } else if (fullHttpRequest.method() == HttpMethod.GET) {
+                handleGet(channelHandlerContext, fullHttpRequest, info);
+            } else {
+                RouterHandlerUtils.send405(channelHandlerContext);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            RouterHandlerUtils.send404(channelHandlerContext);
         }
+
     }
 
     /**
@@ -54,10 +61,15 @@ public class AdminBucketsHandler extends SimpleChannelInboundHandler<FullHttpReq
         if (bucket == null) {
             RouterHandlerUtils.send404(channelHandlerContext);
         }
-        if (!facade.bucketExists(bucket)) {
-            facade.createBucket(bucket);
+        if (bucket.equals("")) {
+            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.error("缺少参数")));
         }
-        RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok()));
+        try {
+            facade.createBucket(bucket);
+            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok()));
+        } catch (ServiceException e) {
+            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.error(e)));
+        }
     }
 
     /**
@@ -70,13 +82,15 @@ public class AdminBucketsHandler extends SimpleChannelInboundHandler<FullHttpReq
      */
     private void handleDelete(ChannelHandlerContext channelHandlerContext, FullHttpRequest fullHttpRequest, PathInfo info) {
         String bucket = info.getIndex(3);
-        if (bucket == null) {
+        if (bucket == null || bucket.trim().equals("")) {
             RouterHandlerUtils.send404(channelHandlerContext);
         }
-        if (!facade.bucketExists(bucket)) {
+        try {
             facade.deleteBucket(bucket);
+            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok()));
+        } catch (ServiceException e) {
+            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.error(e)));
         }
-        RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok()));
     }
 
     /**
@@ -92,10 +106,10 @@ public class AdminBucketsHandler extends SimpleChannelInboundHandler<FullHttpReq
     private void handleGet(ChannelHandlerContext channelHandlerContext, FullHttpRequest fullHttpRequest, PathInfo info) {
         if (info.paths.length == 3) {
             List<BucketMeta> metas = facade.listBuckets();
-            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(metas));
+            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok(metas)));
         } else if (info.paths.length == 5 && info.getIndex(4).equals("stat")) {
             BucketMeta meta = facade.headBucket(info.getIndex(3));
-            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(meta));
+            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok(meta)));
         } else if (info.paths.length == 5 && info.getIndex(4).equals("objects")) {
 
         } else {

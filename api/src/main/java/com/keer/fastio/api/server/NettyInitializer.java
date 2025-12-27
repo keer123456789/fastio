@@ -23,7 +23,7 @@ public class NettyInitializer extends ChannelInitializer<SocketChannel> {
     @Override
     protected void initChannel(SocketChannel ch) {
         ChannelPipeline p = ch.pipeline();
-        p.addLast(new HttpServerCodec());
+        p.addLast("HttpServerCodec",new HttpServerCodec());
         p.addLast(new RouterHandler(storage));
     }
 }

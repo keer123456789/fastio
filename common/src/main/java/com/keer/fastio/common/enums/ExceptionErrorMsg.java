@@ -11,7 +11,7 @@ public enum ExceptionErrorMsg {
 
     BucketExists("3100", "bucket already exists"),
     BucketIsNull("3101", "bucket is null or empty"),
-
+    BucketNotExists("3102", "bucket is not exists"),
     FileCreatFail("3400", "file/dir creation fail"),
     FileNoDiskWriteFail("3401", "file no disk write "),
     FileWriteFail("3402", "data do not write to local file"),

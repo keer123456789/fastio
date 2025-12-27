@@ -26,7 +26,7 @@ public class NettyApiServer implements ApiServer {
         if (config != null && config.getApi() != null) {
             this.port = config.getApi().getPort();
         }
-        this.port = port;
+
         this.storage = storage;
     }
 

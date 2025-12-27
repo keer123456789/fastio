@@ -81,6 +81,8 @@ public class LocalFileStorage implements StorageFacade {
                     }
                 }
             }
+        } else {
+            throw new ServiceException(ExceptionErrorMsg.BucketNotExists);
         }
 
     }
@@ -95,7 +97,7 @@ public class LocalFileStorage implements StorageFacade {
 
     @Override
     public boolean bucketExists(String bucket) {
-        return dbManager.exists(bucket);
+        return dbManager.exists(Constants.CACHE_BUCKET_PREFIX + bucket);
     }
 
     @Override
@@ -201,7 +203,6 @@ public class LocalFileStorage implements StorageFacade {
         if (request.getBucket() == null || request.getBucket().equals("")) {
             throw new ServiceException(ExceptionErrorMsg.BucketIsNull);
         }
-
 
 
         return Collections.emptyList();

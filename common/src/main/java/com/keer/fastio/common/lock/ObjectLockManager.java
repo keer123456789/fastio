@@ -1,5 +1,6 @@
 package com.keer.fastio.common.lock;
 
+
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.keer.fastio.common.manager.AbstractResourceManager;
@@ -23,7 +24,7 @@ public class ObjectLockManager extends AbstractResourceManager {
 
     @Override
     public int getOrder() {
-        return 0;
+        return 2;
     }
 
     @Override

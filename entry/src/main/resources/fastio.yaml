@@ -1,0 +1,10 @@
+api:
+  port: 9372
+
+storage:
+  rockDb:
+    path: data/rockdb/
+  units:
+    - id: 1
+      path: data/unit1/
+

@@ -80,7 +80,7 @@ public class LocalDiskManager extends AbstractResourceManager {
 
     @Override
     public int getOrder() {
-        return 0;
+        return 1;
     }
 
     @Override

@@ -146,8 +146,9 @@ public class RocksDbManager extends AbstractResourceManager {
 
             // 查找以 "user_" 开头的所有key
             byte[] prefixBytes = prefix.getBytes();
-
-            for (iterator.seek(prefixBytes); iterator.isValid(); iterator.next()) {
+            // 定位到前缀开始位置
+            iterator.seek(prefixBytes);
+            while (iterator.isValid()) {
                 byte[] key = iterator.key();
 
                 // 检查是否仍然匹配前缀
@@ -155,13 +156,19 @@ public class RocksDbManager extends AbstractResourceManager {
                     break;
                 }
 
-                // 处理匹配的键值对
+                // 获取值并添加到结果列表
                 byte[] value = iterator.value();
-                try {
-                    results.add(new String(db.get(value)));
-                } catch (Exception e) {
-
+                if (value != null) {
+                    try {
+                        // 直接将迭代器返回的值转为字符串
+                        results.add(new String(value, StandardCharsets.UTF_8));
+                    } catch (Exception e) {
+                        logger.error("转换值失败: key={}", ByteUtils.bytesToHex(key), e);
+                        results.add("[ERROR: " + e.getMessage() + "]");
+                    }
                 }
+
+                iterator.next();
             }
         }
         return results;

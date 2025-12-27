@@ -48,6 +48,17 @@ public class Main {
         AbstractResourceManager objectLockManager = new ObjectLockManager();
         manager.register(objectLockManager);
         manager.init();
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("正在关闭资源...");
+            try {
+                manager.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }));
+
+
         StorageFacade storage = new LocalFileStorage();
         // 2️⃣ 初始化 API Server
         ApiServer apiServer = new NettyApiServer(config, storage);
@@ -60,4 +71,6 @@ public class Main {
         // - Metrics Server
         // - Raft Node
     }
+
+
 }

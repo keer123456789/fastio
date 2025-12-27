@@ -20,6 +20,6 @@ public class PathInfo {
         if (index >= paths.length || index < 0) {
             return null;
         }
-        return paths[0];
+        return paths[index];
     }
 }
