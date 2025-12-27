@@ -35,9 +35,4 @@ public class AdminHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         }
     }
 
-    private void send(ChannelHandlerContext ctx, String msg) {
-        FullHttpResponse resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, ctx.alloc().buffer().writeBytes(msg.getBytes()));
-        resp.headers().set(HttpHeaderNames.CONTENT_LENGTH, resp.content().readableBytes());
-        ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
-    }
 }

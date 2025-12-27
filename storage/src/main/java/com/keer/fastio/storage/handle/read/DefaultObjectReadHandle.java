@@ -4,6 +4,7 @@ import com.keer.fastio.common.entity.ObjectMeta;
 import com.keer.fastio.common.lock.LockLease;
 import com.keer.fastio.storage.handle.ObjectReadHandle;
 
+import javax.activation.MimetypesFileTypeMap;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Paths;
@@ -66,5 +67,11 @@ public class DefaultObjectReadHandle implements ObjectReadHandle {
             readLock.unlock();
             readLock.release();
         }
+    }
+
+    @Override
+    public String mimeType() {
+        MimetypesFileTypeMap mimeTypesMap = new MimetypesFileTypeMap();
+        return mimeTypesMap.getContentType(meta.getPhysicalPath());
     }
 }

@@ -1,5 +1,7 @@
 package com.keer.fastio.api.entity;
 
+import com.keer.fastio.common.exception.ServiceException;
+
 /**
  * @Author: 张经伦
  * @Date: 2025/12/22  14:23
@@ -7,7 +9,8 @@ package com.keer.fastio.api.entity;
  */
 public class Result<T> {
     private static final int CODE_OK = 1000;
-    private static final int CODE_ERROR = 2000;
+    //未知异常
+    private static final int CODE_ERROR = 5000;
     private int code;
     private String msg;
     private T data;
@@ -55,5 +58,17 @@ public class Result<T> {
 
     public static Result error(int code, String msg) {
         return new Result(code, msg, null);
+    }
+
+    public static Result error(ServiceException e) {
+        return new Result(Integer.valueOf(e.getErrorCode()), e.getMessage(), null);
+    }
+
+    public static Result error(String msg) {
+        return new Result(CODE_ERROR, msg, null);
+    }
+
+    public static Result error(Exception e) {
+        return new Result(CODE_ERROR, e.getMessage(), null);
     }
 }

@@ -1,5 +1,6 @@
 package com.keer.fastio.api.handler.admin;
 
+import com.keer.fastio.api.entity.PathInfo;
 import com.keer.fastio.api.entity.Result;
 import com.keer.fastio.api.utils.RouterHandlerUtils;
 import com.keer.fastio.common.entity.BucketMeta;
@@ -60,24 +61,6 @@ public class AdminBucketsHandler extends SimpleChannelInboundHandler<FullHttpReq
     }
 
     /**
-     * HEAD 方法
-     * 1. /admin/buckets/{bucket}  创建bucket
-     *
-     * @param channelHandlerContext
-     * @param fullHttpRequest
-     * @param info
-     */
-    private void handleHead(ChannelHandlerContext channelHandlerContext, FullHttpRequest fullHttpRequest, PathInfo info) {
-        String bucket = info.getIndex(3);
-        if (bucket == null) {
-            RouterHandlerUtils.send404(channelHandlerContext);
-        }
-        BucketMeta meta = facade.headBucket(bucket);
-        RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok(meta)));
-    }
-
-
-    /**
      * DELETE 方法
      * 1./admin/buckets/{bucket}
      *
@@ -120,22 +103,5 @@ public class AdminBucketsHandler extends SimpleChannelInboundHandler<FullHttpReq
         }
     }
 
-    private static class PathInfo {
-        public String path;
-        public String[] paths;
 
-        PathInfo(String path) {
-            this.path = path;
-            if (this.path != null) {
-                this.paths = this.path.split("/");
-            }
-        }
-
-        String getIndex(int index) {
-            if (index >= paths.length || index < 0) {
-                return null;
-            }
-            return paths[0];
-        }
-    }
 }

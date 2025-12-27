@@ -18,6 +18,7 @@ public interface ObjectReadHandle extends AutoCloseable {
 
     long totalObjectSize();    // 原始对象大小
 
+    String mimeType();
     // ===== 读取方式 =====
 
     /**

@@ -29,7 +29,7 @@ public class DataHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         if (path.startsWith("/data/object/")) {
             p.addLast(new DataObjectHandler(facade));
         } else if (path.startsWith("/data/multi/")) {
-            p.addLast(new DataMultiHandler());
+            p.addLast(new DataMultiHandler(facade));
         }else{
             RouterHandlerUtils.send404(ctx);
             return;
