@@ -14,7 +14,7 @@
 |--------|------------------------------------------------------------|---------|
 | PUT    | /data/object/{bucket}/{objectKey}                          | 上传对象    |
 | GET    | /data/object/{bucket}/{objectKey}                          | 获取对象    |
-| HEAD   | /data/object/{bucket}/{objectKey}                          | 获取对象元信息 |
+| GET    | /data/object/{bucket}/{objectKey}/head                     | 获取对象元信息 |
 | DELETE | /data/object/{bucket}/{objectKey}                          | 删除对象    |
 | POST   | /data/multi/{bucket}/{objectKey}                           | 创建分片任务  |
 | PUT    | /data/multi/{bucket}/{objectKey}?uploadId=xxx&partNumber=1 | 上传分片    |

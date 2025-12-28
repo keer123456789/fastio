@@ -4,7 +4,6 @@ import com.keer.fastio.api.entity.PathInfo;
 import com.keer.fastio.api.entity.Result;
 import com.keer.fastio.api.utils.RouterHandlerUtils;
 import com.keer.fastio.common.entity.MultipartUploadMeta;
-import com.keer.fastio.common.entity.ObjectMeta;
 import com.keer.fastio.common.exception.ServiceException;
 import com.keer.fastio.common.utils.ByteUtils;
 import com.keer.fastio.common.utils.JsonUtil;
@@ -17,10 +16,10 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.*;
 
-import javax.sql.rowset.serial.SerialException;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.Map;
 
@@ -73,16 +72,16 @@ public class DataMultiHandler extends SimpleChannelInboundHandler<HttpObject> {
         String uploadId = getFirstParam(params, "uploadId");
         if (uploadId == null) {
             uploadId = storageFacade.initiateMultipartUpload(info.getIndex(3), info.getIndex(4));
-            RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.ok(uploadId)));
+            RouterHandlerUtils.send200(ctx, Result.ok(uploadId));
         } else {
             CompleteMultipartRequest request = new CompleteMultipartRequest();
             request.setUploadId(uploadId);
             request.setBucket(info.getIndex(3));
             try {
                 storageFacade.completeMultipartUpload(request);
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.ok()));
+                RouterHandlerUtils.send200(ctx, Result.ok());
             } catch (ServiceException e) {
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e)));
+                RouterHandlerUtils.send200(ctx, Result.error(e));
             }
         }
 
@@ -99,9 +98,9 @@ public class DataMultiHandler extends SimpleChannelInboundHandler<HttpObject> {
         } else {
             try {
                 storageFacade.abortMultipartUpload(info.getIndex(3), uploadId);
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.ok()));
+                RouterHandlerUtils.send200(ctx, Result.ok());
             } catch (ServiceException e) {
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e)));
+                RouterHandlerUtils.send200(ctx, Result.error(e));
             }
         }
 
@@ -115,20 +114,24 @@ public class DataMultiHandler extends SimpleChannelInboundHandler<HttpObject> {
         String uploadId = getFirstParam(params, "uploadId");
         String partNumber = getFirstParam(params, "partNumber");
         if (uploadId == null || partNumber == null) {
-            RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(2000, "参数缺失")));
+            RouterHandlerUtils.send200(ctx, Result.error(2000, "参数缺失"));
         } else {
+            try {
+                md5 = MessageDigest.getInstance("MD5");
+            } catch (NoSuchAlgorithmException e) {
+                throw new RuntimeException(e);
+            }
             UploadPartRequest request = new UploadPartRequest();
             request.setUploadId(uploadId);
             request.setBucketName(info.getIndex(3));
             request.setIndex(Integer.parseInt(partNumber));
             try {
 
-
                 this.writeHandle = storageFacade.uploadPart(request);
                 this.writeChannel = writeHandle.openWriteChannel();
                 this.receivedBytes = 0;
             } catch (ServiceException e) {
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e)));
+                RouterHandlerUtils.send200(ctx, Result.error(e));
             }
         }
 
@@ -141,25 +144,33 @@ public class DataMultiHandler extends SimpleChannelInboundHandler<HttpObject> {
 
         ByteBuf buf = content.content();
         int readable = buf.readableBytes();
+        if (buf.hasArray()) {
+            // 如果是堆内内存，直接用数组（零拷贝）
+            md5.update(buf.array(), buf.arrayOffset() + buf.readerIndex(), readable);
+        } else {
+            // 如果是堆外内存 (Direct Buffer)，必须读出来
+            byte[] bytes = new byte[readable];
+            buf.getBytes(buf.readerIndex(), bytes);
+            md5.update(bytes);
+        }
         receivedBytes += readable;
-        md5.update(buf.array(), buf.readerIndex(), readable);
         try {
             // ⚠️ 零拷贝写入
             buf.readBytes(Channels.newOutputStream(writeChannel), readable);
         } catch (Exception e) {
             //TODO 异常回滚？
-            RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e.getMessage())));
+            RouterHandlerUtils.send200(ctx, Result.error(e.getMessage()));
         }
         if (content instanceof LastHttpContent) {
             byte[] digest = md5.digest();
             String etag = ByteUtils.bytesToHex(digest);
             try {
                 MultipartUploadMeta meta = writeHandle.commit(receivedBytes, etag);
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.ok(meta)));
+                RouterHandlerUtils.send200(ctx, Result.ok(meta));
             } catch (ServiceException e) {
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e)));
+                RouterHandlerUtils.send200(ctx, Result.error(e));
             } catch (Exception e) {
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e)));
+                RouterHandlerUtils.send200(ctx, Result.error(e));
             }
         }
     }

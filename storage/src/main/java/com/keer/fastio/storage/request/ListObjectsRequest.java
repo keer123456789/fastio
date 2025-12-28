@@ -8,7 +8,7 @@ package com.keer.fastio.storage.request;
 public class ListObjectsRequest {
     private String bucket;
     private String prefix;
-    private long size = 10;
+    private int size = 10;
 
     public String getBucket() {
         return bucket;
@@ -26,11 +26,11 @@ public class ListObjectsRequest {
         this.prefix = prefix;
     }
 
-    public long getSize() {
+    public int getSize() {
         return size;
     }
 
-    public void setSize(long size) {
+    public void setSize(int size) {
         this.size = size;
     }
 }

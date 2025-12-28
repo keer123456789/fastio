@@ -138,7 +138,10 @@ public class RocksDbManager extends AbstractResourceManager {
     }
 
 
-    public List<String> queryByStartPrefix(String prefix) {
+    public List<String> queryByStartPrefix(String prefix, Integer size) {
+        if (size == null) {
+            size = 1000;
+        }
         List<String> results = new LinkedList<>();
         // 使用前缀迭代器
         try (final ReadOptions readOptions = new ReadOptions();
@@ -162,6 +165,9 @@ public class RocksDbManager extends AbstractResourceManager {
                     try {
                         // 直接将迭代器返回的值转为字符串
                         results.add(new String(value, StandardCharsets.UTF_8));
+                        if (results.size() >= size) {
+                            break;
+                        }
                     } catch (Exception e) {
                         logger.error("转换值失败: key={}", ByteUtils.bytesToHex(key), e);
                         results.add("[ERROR: " + e.getMessage() + "]");
@@ -172,6 +178,9 @@ public class RocksDbManager extends AbstractResourceManager {
             }
         }
         return results;
+    }
+    public List<String> queryByStartPrefix(String prefix) {
+       return queryByStartPrefix(prefix, 1000);
     }
 
     private boolean startsWith(byte[] array, byte[] prefix) {

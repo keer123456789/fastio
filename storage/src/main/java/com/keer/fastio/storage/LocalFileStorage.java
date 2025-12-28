@@ -112,6 +112,9 @@ public class LocalFileStorage implements StorageFacade {
 
     @Override
     public ObjectWriteHandle putObject(PutObjectRequest request) {
+        if (!bucketExists(request.getBucket())) {
+            throw new ServiceException(ExceptionErrorMsg.BucketNotExists);
+        }
         String hashKey = request.getBucket() + request.getKey();
         String hashStr = HashUtils.hexHash(hashKey);
         LocalStorageUnit unit = localDiskManager.selectUnit(hashKey, LocalDiskManager.WRITE_MODEL);
@@ -155,7 +158,7 @@ public class LocalFileStorage implements StorageFacade {
     public ObjectReadHandle getObject(GetObjectRequest request) {
         LockLease lock = this.objectLockManager.acquireReadLock(LockKeys.object(request.getBucket(), request.getKey()));
         lock.lock();
-        ObjectMeta meta = headObject(request.getBucket(), request.getKey());
+         ObjectMeta meta = headObject(request.getBucket(), request.getKey());
         if (meta == null) {
             lock.unlock();
             return null;
@@ -203,9 +206,13 @@ public class LocalFileStorage implements StorageFacade {
         if (request.getBucket() == null || request.getBucket().equals("")) {
             throw new ServiceException(ExceptionErrorMsg.BucketIsNull);
         }
+        String prefix = Constants.CACHE_OBJECT_PREFIX + request.getBucket() + "/" + (request.getPrefix() == null || request.getPrefix().equals("") ? "" : request.getPrefix());
+        List<String> results = dbManager.queryByStartPrefix(prefix, request.getSize());
 
-
-        return Collections.emptyList();
+        if (results.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return results.stream().map(s -> JsonUtil.fromJson(s, ObjectMeta.class)).collect(Collectors.toList());
     }
 
     @Override
@@ -259,6 +266,10 @@ public class LocalFileStorage implements StorageFacade {
         try {
             String tempId = UUID.randomUUID().toString().replace("-", "");
             Path tempPath = Paths.get(meta.getDiskPath(), meta.getBucket(), ".temp", tempId + ".data");
+            try{
+            Files.createDirectories(tempPath.getParent());}catch (IOException e){
+                throw new ServiceException(e);
+            }
             List<Path> partPaths = new LinkedList<>();
             for (Map.Entry<Integer, PartMeta> e : meta.getParts().entrySet()) {
                 Path partPath = Paths.get(e.getValue().getPath());
@@ -285,6 +296,7 @@ public class LocalFileStorage implements StorageFacade {
             objectMeta.setSize(result.getTotalSize());
             objectMeta.setEtag(result.getEtag());
             objectMeta.setPhysicalPath(finalPath.toString());
+            objectMeta.setStatus(ObjectStatus.VISIBLE);
             dbManager.put(buildObjectKey(meta.getBucket(), meta.getKey()), JsonUtil.toJson(objectMeta));
 
 

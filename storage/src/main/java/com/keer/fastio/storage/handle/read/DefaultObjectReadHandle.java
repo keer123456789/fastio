@@ -36,7 +36,7 @@ public class DefaultObjectReadHandle implements ObjectReadHandle {
 
     @Override
     public long contentLength() {
-        return 0;
+        return meta.getSize();
     }
 
     @Override

@@ -57,8 +57,6 @@ public class DataObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
             handlePut(ctx, req);
         } else if (req.method() == HttpMethod.GET) {
             handleGet(ctx, req);
-        } else if (req.method() == HttpMethod.HEAD) {
-            handleHead(ctx, req);
         } else if (req.method() == HttpMethod.DELETE) {
             handleDelete(ctx, req);
         } else {
@@ -85,10 +83,13 @@ public class DataObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
         PutObjectRequest request = new PutObjectRequest();
         request.setBucket(info.getIndex(3));
         request.setKey(info.getIndex(4));
-
-        this.writeHandle = storageFacade.putObject(request);
-        this.writeChannel = writeHandle.openWriteChannel();
-        this.receivedBytes = 0;
+        try {
+            this.writeHandle = storageFacade.putObject(request);
+            this.writeChannel = writeHandle.openWriteChannel();
+            this.receivedBytes = 0;
+        } catch (ServiceException e) {
+            RouterHandlerUtils.send200(ctx, Result.error(e));
+        }
     }
 
     /**
@@ -102,27 +103,35 @@ public class DataObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
         if (writeChannel == null) {
             return;
         }
-
         ByteBuf buf = content.content();
         int readable = buf.readableBytes();
+        if (buf.hasArray()) {
+            // 如果是堆内内存，直接用数组（零拷贝）
+            md5.update(buf.array(), buf.arrayOffset() + buf.readerIndex(), readable);
+        } else {
+            // 如果是堆外内存 (Direct Buffer)，必须读出来
+            byte[] bytes = new byte[readable];
+            buf.getBytes(buf.readerIndex(), bytes);
+            md5.update(bytes);
+        }
         receivedBytes += readable;
-        md5.update(buf.array(), buf.readerIndex(), readable);
+
         try {
             // ⚠️ 零拷贝写入
             buf.readBytes(Channels.newOutputStream(writeChannel), readable);
         } catch (Exception e) {
-            RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e)));
+            RouterHandlerUtils.send200(ctx, Result.error(e));
         }
         if (content instanceof LastHttpContent) {
             byte[] digest = md5.digest();
             String etag = ByteUtils.bytesToHex(digest);
             try {
                 ObjectMeta meta = writeHandle.commit(receivedBytes, etag);
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.ok(meta)));
+                RouterHandlerUtils.send200(ctx, Result.ok(meta));
             } catch (ServiceException e) {
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e)));
+                RouterHandlerUtils.send200(ctx, Result.error(e));
             } catch (Exception e) {
-                RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e)));
+                RouterHandlerUtils.send200(ctx, Result.error(e));
             }
         }
     }
@@ -137,50 +146,67 @@ public class DataObjectHandler extends SimpleChannelInboundHandler<HttpObject> {
     private void handleGet(ChannelHandlerContext ctx, HttpRequest req) {
         String path = new QueryStringDecoder(req.uri()).path();
         PathInfo info = new PathInfo(path);
-        GetObjectRequest request = new GetObjectRequest();
-        request.setBucket(info.getIndex(3));
-        request.setKey(info.getIndex(4));
-        ObjectReadHandle handle = storageFacade.getObject(request);
-        FileChannel fileChannel = (FileChannel) handle.openChannel();
-        HttpResponse response = new DefaultHttpResponse(HTTP_1_1, HttpResponseStatus.OK);
-        response.headers().set(HttpHeaderNames.CONTENT_TYPE, handle.mimeType());
-        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, handle.contentLength());
-        response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-        ctx.write(response);
-        long position = 0;
-        long count = handle.contentLength();
-        DefaultFileRegion region = new DefaultFileRegion(fileChannel, position, count);
+        if (info.paths.length == 5) {
+            GetObjectRequest request = new GetObjectRequest();
+            request.setBucket(info.getIndex(3));
+            request.setKey(info.getIndex(4));
+            ObjectReadHandle handle = null;
+            try {
+                handle = storageFacade.getObject(request);
+                FileChannel fileChannel = (FileChannel) handle.openChannel();
+                HttpResponse response = new DefaultHttpResponse(HTTP_1_1, HttpResponseStatus.OK);
+                response.headers().set(HttpHeaderNames.CONTENT_TYPE, handle.mimeType());
+                response.headers().set(HttpHeaderNames.CONTENT_LENGTH, handle.contentLength());
+                response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                ctx.write(response);
+                long position = 0;
+                long count = handle.contentLength();
+                DefaultFileRegion region = new DefaultFileRegion(fileChannel, position, count);
 
-        // 3. 写出文件区域
-        ChannelFuture sendFileFuture = ctx.write(region);
+                // 3. 写出文件区域
+                ChannelFuture sendFileFuture = ctx.write(region);
+                ObjectReadHandle finalHandle = handle;
+                // 4. 添加监听器，传输完成后关闭文件通道
+                sendFileFuture.addListener((ChannelFutureListener) future -> {
+                    try {
+                        finalHandle.close();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
 
-        // 4. 添加监听器，传输完成后关闭文件通道
-        sendFileFuture.addListener((ChannelFutureListener) future -> {
-            // 如果不是长连接，则关闭 Channel
-            if (!HttpUtil.isKeepAlive(req)) {
-                handle.close();
+                    // 只有非 Keep-Alive 才关闭连接
+                    if (!HttpUtil.isKeepAlive(req)) {
+                        ctx.close();
+                    }
+                });
+                // 5. 写入结束标记
+                ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+            } catch (Exception e) {
+                if (handle != null) {
+                    try {
+                        handle.close();
+                    } catch (Exception ex) {/* ignore */}
+                }
+                RouterHandlerUtils.send200(ctx, Result.error(e));
             }
-        });
-        // 5. 写入结束标记
-        ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+        } else if (info.paths.length == 6 && info.getIndex(5).equals("head")) {
+            ObjectMeta meta = storageFacade.headObject(info.getIndex(3), info.getIndex(4));
+            RouterHandlerUtils.send200(ctx, Result.ok(meta));
+        } else {
+            RouterHandlerUtils.send404(ctx);
+        }
 
     }
 
-    private void handleHead(ChannelHandlerContext ctx, HttpRequest req) {
-        String path = new QueryStringDecoder(req.uri()).path();
-        PathInfo info = new PathInfo(path);
-        ObjectMeta meta = storageFacade.headObject(info.getIndex(3), info.getIndex(4));
-        RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.ok(meta)));
-    }
 
     private void handleDelete(ChannelHandlerContext ctx, HttpRequest req) {
         String path = new QueryStringDecoder(req.uri()).path();
         PathInfo info = new PathInfo(path);
         try {
             storageFacade.deleteObject(info.getIndex(3), info.getIndex(4));
-            RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.ok()));
+            RouterHandlerUtils.send200(ctx, Result.ok());
         } catch (ServiceException e) {
-            RouterHandlerUtils.send200(ctx, JsonUtil.toJson(Result.error(e)));
+            RouterHandlerUtils.send200(ctx, Result.error(e));
         }
 
     }

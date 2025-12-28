@@ -4,9 +4,11 @@ import com.keer.fastio.api.entity.PathInfo;
 import com.keer.fastio.api.entity.Result;
 import com.keer.fastio.api.utils.RouterHandlerUtils;
 import com.keer.fastio.common.entity.BucketMeta;
+import com.keer.fastio.common.entity.ObjectMeta;
 import com.keer.fastio.common.exception.ServiceException;
 import com.keer.fastio.common.utils.JsonUtil;
 import com.keer.fastio.storage.StorageFacade;
+import com.keer.fastio.storage.request.ListObjectsRequest;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -14,6 +16,7 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.QueryStringDecoder;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * @Author: 张经伦
@@ -62,13 +65,13 @@ public class AdminBucketsHandler extends SimpleChannelInboundHandler<FullHttpReq
             RouterHandlerUtils.send404(channelHandlerContext);
         }
         if (bucket.equals("")) {
-            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.error("缺少参数")));
+            RouterHandlerUtils.send200(channelHandlerContext,Result.error("缺少参数"));
         }
         try {
             facade.createBucket(bucket);
-            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok()));
+            RouterHandlerUtils.send200(channelHandlerContext, Result.ok());
         } catch (ServiceException e) {
-            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.error(e)));
+            RouterHandlerUtils.send200(channelHandlerContext, Result.error(e));
         }
     }
 
@@ -87,9 +90,9 @@ public class AdminBucketsHandler extends SimpleChannelInboundHandler<FullHttpReq
         }
         try {
             facade.deleteBucket(bucket);
-            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok()));
+            RouterHandlerUtils.send200(channelHandlerContext, Result.ok());
         } catch (ServiceException e) {
-            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.error(e)));
+            RouterHandlerUtils.send200(channelHandlerContext, Result.error(e));
         }
     }
 
@@ -106,16 +109,31 @@ public class AdminBucketsHandler extends SimpleChannelInboundHandler<FullHttpReq
     private void handleGet(ChannelHandlerContext channelHandlerContext, FullHttpRequest fullHttpRequest, PathInfo info) {
         if (info.paths.length == 3) {
             List<BucketMeta> metas = facade.listBuckets();
-            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok(metas)));
+            RouterHandlerUtils.send200(channelHandlerContext, Result.ok(metas));
         } else if (info.paths.length == 5 && info.getIndex(4).equals("stat")) {
             BucketMeta meta = facade.headBucket(info.getIndex(3));
-            RouterHandlerUtils.send200(channelHandlerContext, JsonUtil.toJson(Result.ok(meta)));
+            RouterHandlerUtils.send200(channelHandlerContext, Result.ok(meta));
         } else if (info.paths.length == 5 && info.getIndex(4).equals("objects")) {
+            String uri = fullHttpRequest.uri();
+            QueryStringDecoder decoder = new QueryStringDecoder(uri, java.nio.charset.StandardCharsets.UTF_8);
+            Map<String, List<String>> params = decoder.parameters();
+            String prefix = getFirstParam(params, "prefix");
 
+            ListObjectsRequest request = new ListObjectsRequest();
+            request.setBucket(info.getIndex(3));
+            if (prefix != null && !prefix.trim().equals("")) {
+                request.setPrefix(prefix);
+            }
+            List<ObjectMeta> metas = facade.listObjects(request);
+            RouterHandlerUtils.send200(channelHandlerContext, Result.ok(metas));
         } else {
             RouterHandlerUtils.send404(channelHandlerContext);
         }
     }
 
+    private String getFirstParam(Map<String, List<String>> params, String key) {
+        List<String> values = params.get(key);
+        return (values != null && !values.isEmpty()) ? values.get(0) : null;
+    }
 
 }
