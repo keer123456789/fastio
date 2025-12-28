@@ -26,7 +26,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * @Author: 张经伦
@@ -69,9 +68,7 @@ public class LocalDiskManager extends AbstractResourceManager {
     public static final int WRITE_MODEL = 1;
 
     public LocalDiskManager(List<StorageUnitConfig> units) {
-        disks = units.stream().map(u ->
-             new LocalStorageUnit(u.getId(), u.getPath())
-        ).collect(Collectors.toList());
+        disks = units.stream().map(u -> new LocalStorageUnit(u.getId(), u.getPath())).collect(Collectors.toList());
         refreshDiskStatus();
         refreshRing(READ_MODEL);
         refreshRing(WRITE_MODEL);
@@ -181,7 +178,7 @@ public class LocalDiskManager extends AbstractResourceManager {
     }
 
     /**
-     * 删除桶
+     * 删除 以 DEL_ 开头的文件夹
      */
     private void deletePath() {
         for (LocalStorageUnit unit : disks) {
@@ -189,34 +186,40 @@ public class LocalDiskManager extends AbstractResourceManager {
             if (!Files.exists(p) || !Files.isDirectory(p)) {
                 continue;
             }
-            try (Stream<Path> stream = Files.list(p)) {
-                stream.filter(Files::isDirectory)
-                        .filter(ps -> {
-                            String folderName = ps.getFileName().toString();
-                            return folderName.startsWith("DEL_");
-                        })
-                        .forEach(ps -> {
-                            try {
-                                Files.walkFileTree(ps, new SimpleFileVisitor<Path>() {
-                                    @Override
-                                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                                        // 删除文件
-                                        Files.delete(file);
-                                        return FileVisitResult.CONTINUE;
-                                    }
+            List<Path> deletePaths = new LinkedList<>();
+            try {
+                Files.walk(p).filter(path -> {
+                    String name = path.getFileName().toString();
+                    return name.startsWith("DEL_");
+                }).forEach(deletePaths::add);
+            } catch (Exception e) {
+            }
+            //排序 深的在前
+            deletePaths.sort((p1, p2) -> {
+                int depth1 = p1.getNameCount();
+                int depth2 = p2.getNameCount();
+                return Integer.compare(depth2, depth1);
+            });
+            for (Path path : deletePaths) {
+                try {
+                    Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+                        @Override
+                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                            // 删除文件
+                            Files.delete(file);
+                            return FileVisitResult.CONTINUE;
+                        }
 
-                                    @Override
-                                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                                        Files.delete(dir);
-                                        return FileVisitResult.CONTINUE;
-                                    }
-                                });
-                            } catch (IOException e) {
-                                logger.warn("递归删除桶（{}）失败,错误信息：{}", ps.getFileName().getFileName(), e.getMessage());
-                            }
-                        });
-            } catch (IOException e) {
-                logger.warn("查找路径（{}）下的文件夹失败，导致本次删除桶任务失败,错误信息：{}", unit.getPath(), e.getMessage());
+                        @Override
+                        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                            Files.delete(dir);
+                            return FileVisitResult.CONTINUE;
+                        }
+                    });
+                    logger.info("已删除: {}", path);
+                } catch (IOException e) {
+                    logger.warn("删除失败: {}, 原因: {}", path, e.getMessage(), e);
+                }
             }
         }
     }

@@ -25,9 +25,10 @@ public class ServiceException extends RuntimeException {
         this.errorCode = errorCode;
 
     }
-    public ServiceException( Throwable cause) {
+
+    public ServiceException(Throwable cause) {
         super(cause);
-        this.errorCode = "unknown";
+        this.errorCode = ExceptionErrorMsg.UnKnowError.getCode();
     }
 
     public String getErrorCode() {

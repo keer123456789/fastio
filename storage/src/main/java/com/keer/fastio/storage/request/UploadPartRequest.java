@@ -9,7 +9,7 @@ import java.nio.channels.ReadableByteChannel;
  */
 public class UploadPartRequest {
     private String uploadId;
-    private String bucketName;
+    private String bucket;
     private int index;
 
     private ReadableByteChannel dataChannel;
@@ -38,11 +38,11 @@ public class UploadPartRequest {
         this.index = index;
     }
 
-    public String getBucketName() {
-        return bucketName;
+    public String getBucket() {
+        return bucket;
     }
 
-    public void setBucketName(String bucketName) {
-        this.bucketName = bucketName;
+    public void setBucket(String bucket) {
+        this.bucket = bucket;
     }
 }

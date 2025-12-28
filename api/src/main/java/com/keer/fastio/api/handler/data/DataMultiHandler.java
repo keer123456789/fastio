@@ -123,7 +123,7 @@ public class DataMultiHandler extends SimpleChannelInboundHandler<HttpObject> {
             }
             UploadPartRequest request = new UploadPartRequest();
             request.setUploadId(uploadId);
-            request.setBucketName(info.getIndex(3));
+            request.setBucket(info.getIndex(3));
             request.setIndex(Integer.parseInt(partNumber));
             try {
 

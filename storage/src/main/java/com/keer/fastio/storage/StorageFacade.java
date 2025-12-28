@@ -55,8 +55,12 @@ public interface StorageFacade {
      */
     List<BucketMeta> listBuckets();
 
-    // Object
-    ObjectWriteHandle putObject(PutObjectRequest req) throws ServiceException;
+    /**
+     * @param req
+     * @return
+     * @throws ServiceException
+     */
+    ObjectWriteHandle<ObjectMeta> putObject(PutObjectRequest req) throws ServiceException;
 
     /**
      * 获取对象
@@ -102,7 +106,7 @@ public interface StorageFacade {
      *
      * @param request
      */
-    ObjectWriteHandle uploadPart(UploadPartRequest request) throws ServiceException;
+    ObjectWriteHandle<MultipartUploadMeta> uploadPart(UploadPartRequest request) throws ServiceException;
 
     /**
      * 完成断点续传

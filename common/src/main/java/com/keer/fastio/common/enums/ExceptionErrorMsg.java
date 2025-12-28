@@ -7,7 +7,7 @@ package com.keer.fastio.common.enums;
  */
 public enum ExceptionErrorMsg {
     JsonParse("2000", "json transfer error"),
-
+    UnKnowError("2001", ""),
 
     BucketExists("3100", "bucket already exists"),
     BucketIsNull("3101", "bucket is null or empty"),
@@ -15,8 +15,11 @@ public enum ExceptionErrorMsg {
     FileCreatFail("3400", "file/dir creation fail"),
     FileNoDiskWriteFail("3401", "file no disk write "),
     FileWriteFail("3402", "data do not write to local file"),
+    MultipartTaskNotExists("3403", "multipart task not exists"),
 
     NettyFail("4000", "data do not write to local file"),
+
+
     ;
 
     private String code;
